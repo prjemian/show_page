@@ -1,0 +1,1140 @@
+#!/usr/bin/env python3
+"""
+SPAAC Electronic Page Display
+
+Displays Divine Liturgy page numbers and posture cues for church congregation.
+
+Controlled via IR remote through evdev (EV_MSC/MSC_SCAN scancodes).
+"""
+
+import json
+import os
+import select
+import sys
+import threading
+import time
+from pathlib import Path
+
+import evdev
+from evdev import ecodes
+from PyQt5.QtCore import QObject
+from PyQt5.QtCore import QSize
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFontDatabase
+from PyQt5.QtGui import QPalette
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QFrame
+from PyQt5.QtWidgets import QGridLayout
+from PyQt5.QtWidgets import QGroupBox
+from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QScrollArea
+from PyQt5.QtWidgets import QSizePolicy
+from PyQt5.QtWidgets import QSlider
+from PyQt5.QtWidgets import QSpacerItem
+from PyQt5.QtWidgets import QStackedWidget
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QWidget
+
+# ---------------------------------------------------------------------------
+# Configuration defaults and paths
+# ---------------------------------------------------------------------------
+
+CONFIG_DIR = Path.home() / ".spaac"
+CONFIG_FILE = CONFIG_DIR / "config.json"
+KEYMAP_FILE = CONFIG_DIR / "keymap.json"
+
+DEFAULT_CONFIG = {
+    "repeat_delay_ms": 500,  # ms before key repeat begins
+    "repeat_rate_ms": 200,  # ms between repeats (5/sec)
+    "max_repeats_per_sec": 10,  # upper bound for settings UI
+    "min_page": 1,
+    "max_page": 999,
+    "book_color": "#1a3a5c",  # dark blue, like a blue hymnal
+    "text_color": "#f0e6c8",  # warm cream/ivory
+    "posture_stand_color": "#c8a84e",
+    "posture_sit_color": "#6b8f6b",
+    "posture_kneel_color": "#8b5e3c",
+    "posture_duration_sec": 0,  # 0 = stay until toggled off
+}
+
+# Logical function names for IR mapping — split into two groups for layout
+FUNCTION_NAMES_CONTROLS = [
+    "page_up",  # RIGHT - increment page
+    "page_down",  # LEFT  - decrement page
+    "stand",  # UP    - congregation stand
+    "sit",  # DOWN  - congregation sit
+    "kneel",  # kneel
+    "enter",  # accept dialed page
+    "cancel",  # cancel dialed page (LAST or STOP)
+    "backspace",  # delete last digit entered
+    "setup",  # enter setup/teach mode
+]
+
+FUNCTION_NAMES_DIGITS = [
+    "digit_0",
+    "digit_1",
+    "digit_2",
+    "digit_3",
+    "digit_4",
+    "digit_5",
+    "digit_6",
+    "digit_7",
+    "digit_8",
+    "digit_9",
+]
+
+# Combined list for iteration where order doesn't matter
+FUNCTION_NAMES = FUNCTION_NAMES_CONTROLS + FUNCTION_NAMES_DIGITS
+
+FUNCTION_LABELS = {
+    "page_up": "Next Page (→)",
+    "page_down": "Prev Page (←)",
+    "stand": "Stand (↑)",
+    "sit": "Sit (↓)",
+    "kneel": "Kneel",
+    "digit_0": "0",
+    "digit_1": "1",
+    "digit_2": "2",
+    "digit_3": "3",
+    "digit_4": "4",
+    "digit_5": "5",
+    "digit_6": "6",
+    "digit_7": "7",
+    "digit_8": "8",
+    "digit_9": "9",
+    "enter": "Enter / Accept",
+    "cancel": "Cancel (LAST/STOP)",
+    "backspace": "Backspace (⌫)",
+    "setup": "Setup / Teach",
+}
+
+POSTURE_NONE = ""
+POSTURE_STAND = "STAND"
+POSTURE_SIT = "SIT"
+POSTURE_KNEEL = "KNEEL"
+
+POSTURE_SYMBOLS = {
+    POSTURE_NONE: "",
+    POSTURE_STAND: "PLEASE STAND",
+    POSTURE_SIT: "PLEASE BE SEATED",
+    POSTURE_KNEEL: "PLEASE KNEEL",
+}
+
+
+# ---------------------------------------------------------------------------
+# Persistence helpers
+# ---------------------------------------------------------------------------
+
+
+def load_json(path, default):
+    """Load JSON file or return default."""
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return dict(default)
+
+
+def save_json(path, data):
+    """Save dict as JSON."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# IR Reader Thread  (evdev, EV_MSC only)
+# ---------------------------------------------------------------------------
+
+
+class IRReader(QObject):
+    """
+    Reads raw IR scancodes from evdev input device.
+    Emits scancode_received(int) for each EV_MSC / MSC_SCAN event.
+    Includes built-in debounce so that held buttons don't flood
+    downstream consumers (especially Teach Mode).
+    """
+
+    scancode_received = pyqtSignal(int)
+
+    DEFAULT_DEBOUNCE_MS = 500
+
+    def __init__(self, config, parent=None):
+        super().__init__(parent)
+        self.config = config
+        self._running = False
+        self._thread = None
+        self._device = None
+        self._debounce_ms = self.DEFAULT_DEBOUNCE_MS
+        self._last_scancode = None
+        self._last_emit_time = 0.0
+
+    @property
+    def debounce_ms(self):
+        return self._debounce_ms
+
+    @debounce_ms.setter
+    def debounce_ms(self, value):
+        self._debounce_ms = max(0, value)
+
+    def find_ir_device(self):
+        """Find the gpio_ir_recv input device by exact name match."""
+        devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
+        for dev in devices:
+            if dev.name == "gpio_ir_recv":
+                return dev
+        return None
+
+    def start(self):
+        self._running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._running = False
+        if self._device:
+            try:
+                self._device.close()
+            except Exception:
+                pass
+
+    def _run(self):
+        while self._running:
+            if self._device is None:
+                self._device = self.find_ir_device()
+                if self._device is None:
+                    time.sleep(2)
+                    continue
+
+            try:
+                while self._running:
+                    r, _, _ = select.select([self._device.fd], [], [], 0.5)
+                    if not r:
+                        continue
+                    for event in self._device.read():
+                        if (
+                            event.type == ecodes.EV_MSC
+                            and event.code == ecodes.MSC_SCAN
+                        ):
+                            self._debounced_emit(event.value)
+            except OSError:
+                self._device = None
+                time.sleep(2)
+
+    def _debounced_emit(self, scancode):
+        now = time.monotonic()
+        interval = self._debounce_ms / 1000.0
+
+        if scancode == self._last_scancode and (now - self._last_emit_time) < interval:
+            return
+
+        self._last_scancode = scancode
+        self._last_emit_time = now
+        self.scancode_received.emit(scancode)
+
+
+# ---------------------------------------------------------------------------
+# Repeat Controller
+# ---------------------------------------------------------------------------
+
+
+class RepeatController:
+    """
+    Software key-repeat with per-category behavior.
+
+    Categories:
+      - repeatable:  page_up, page_down — initial delay, then rate-limited
+      - single_fire: everything else — one event per distinct press
+    """
+
+    SINGLE_FIRE_GAP_MS = 400
+    REPEATABLE_FUNCTIONS = {"page_up", "page_down"}
+
+    def __init__(self, config, lookup_fn=None):
+        self.config = config
+        self._lookup_fn = lookup_fn
+        self._last_scancode = None
+        self._first_time = 0.0
+        self._last_accepted = 0.0
+
+    def should_accept(self, scancode):
+        now = time.monotonic()
+
+        fn = self._lookup_fn(scancode) if self._lookup_fn else None
+        is_repeatable = fn in self.REPEATABLE_FUNCTIONS
+
+        if scancode != self._last_scancode:
+            self._last_scancode = scancode
+            self._first_time = now
+            self._last_accepted = now
+            return True
+
+        if is_repeatable:
+            delay = self.config.get("repeat_delay_ms", 500) / 1000.0
+            rate = self.config.get("repeat_rate_ms", 200) / 1000.0
+            elapsed = now - self._first_time
+
+            if elapsed < delay:
+                return False
+
+            if now - self._last_accepted >= rate:
+                self._last_accepted = now
+                return True
+
+            return False
+        else:
+            gap = self.SINGLE_FIRE_GAP_MS / 1000.0
+
+            if now - self._last_accepted < gap:
+                return False
+
+            self._last_accepted = now
+            return True
+
+    def reset(self):
+        self._last_scancode = None
+
+
+# ---------------------------------------------------------------------------
+# Test Button Dialog
+# ---------------------------------------------------------------------------
+
+
+class TestButtonDialog(QDialog):
+    """
+    Press any button on the remote and see which function it is
+    mapped to, or whether it is unmapped.
+    """
+
+    def __init__(self, ir_reader, keymap, parent=None):
+        super().__init__(parent)
+        self.ir_reader = ir_reader
+        self.keymap = keymap
+
+        self.setWindowTitle("SPAAC — Test Remote Buttons")
+        self.setModal(True)
+        self.setMinimumSize(500, 350)
+
+        layout = QVBoxLayout(self)
+
+        title = QLabel("Test Remote Buttons")
+        title.setFont(QFont("sans-serif", 18, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        instructions = QLabel(
+            "Press any button on the remote to see\n" "what function it is mapped to."
+        )
+        instructions.setFont(QFont("sans-serif", 12))
+        instructions.setAlignment(Qt.AlignCenter)
+        instructions.setStyleSheet("color: #555;")
+        layout.addWidget(instructions)
+
+        layout.addSpacerItem(QSpacerItem(20, 20))
+
+        self.scancode_label = QLabel("Scancode: —")
+        self.scancode_label.setFont(QFont("monospace", 16))
+        self.scancode_label.setAlignment(Qt.AlignCenter)
+        self.scancode_label.setStyleSheet(
+            "background-color: #fff; border: 1px solid #ccc;"
+            " border-radius: 6px; padding: 10px;"
+        )
+        layout.addWidget(self.scancode_label)
+
+        self.function_label = QLabel("Function: —")
+        self.function_label.setFont(QFont("sans-serif", 20, QFont.Bold))
+        self.function_label.setAlignment(Qt.AlignCenter)
+        self.function_label.setMinimumHeight(60)
+        self.function_label.setStyleSheet(
+            "background-color: #f0f0f0; border: 1px solid #ccc;"
+            " border-radius: 6px; padding: 10px;"
+        )
+        layout.addWidget(self.function_label)
+
+        layout.addSpacerItem(QSpacerItem(20, 30))
+
+        close_btn = QPushButton("Close")
+        close_btn.setFont(QFont("sans-serif", 13))
+        close_btn.setMinimumHeight(44)
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+
+        self.ir_reader.scancode_received.connect(self._on_scancode)
+
+    @pyqtSlot(int)
+    def _on_scancode(self, scancode):
+        sc_str = str(scancode)
+        self.scancode_label.setText(f"Scancode: {scancode}")
+
+        fn = self.keymap.get(sc_str, None)
+        if fn:
+            label = FUNCTION_LABELS.get(fn, fn)
+            self.function_label.setText(f"✓ {label}")
+            self.function_label.setStyleSheet(
+                "background-color: #d4edda; border: 1px solid #28a745;"
+                " border-radius: 6px; padding: 10px;"
+                " color: #155724; font-weight: bold;"
+            )
+        else:
+            self.function_label.setText("✗ UNMAPPED")
+            self.function_label.setStyleSheet(
+                "background-color: #f8d7da; border: 1px solid #dc3545;"
+                " border-radius: 6px; padding: 10px;"
+                " color: #721c24; font-weight: bold;"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Teach Mode Dialog (Two-column form with scroll)
+# ---------------------------------------------------------------------------
+
+
+class TeachDialog(QDialog):
+    """
+    Form-based dialog for mapping IR remote scancodes to logical functions.
+    Two-column layout: control functions on the left, digit functions on
+    the right.  Wrapped in a scroll area for small displays.
+    """
+
+    def __init__(self, ir_reader, current_keymap, parent=None):
+        super().__init__(parent)
+        self.ir_reader = ir_reader
+        self.keymap = dict(current_keymap)
+        self.reverse_map = {}
+        for sc, fn in self.keymap.items():
+            self.reverse_map[fn] = sc
+
+        self.setWindowTitle("SPAAC — Teach Remote Buttons")
+        self.setModal(True)
+        self.setMinimumSize(620, 420)
+
+        self._listening_function = None
+        self._listen_start_time = 0.0
+        self._listen_settle_ms = 600
+        self._listen_timeout_ms = 10000
+
+        self._listen_timer = QTimer()
+        self._listen_timer.setSingleShot(True)
+        self._listen_timer.timeout.connect(self._stop_listening)
+
+        # --- Build UI ---
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(6, 6, 6, 6)
+        main_layout.setSpacing(4)
+
+        title = QLabel("Teach Remote Buttons")
+        title.setFont(QFont("sans-serif", 16, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(title)
+
+        instructions = QLabel(
+            'Click "Learn" next to a function, then press the ' "remote button once."
+        )
+        instructions.setFont(QFont("sans-serif", 10))
+        instructions.setAlignment(Qt.AlignCenter)
+        instructions.setStyleSheet("color: #555;")
+        main_layout.addWidget(instructions)
+
+        # Status bar
+        self.status_label = QLabel("")
+        self.status_label.setFont(QFont("sans-serif", 10))
+        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setMinimumHeight(26)
+        self.status_label.setStyleSheet(
+            "color: #ffffff; background-color: #444;"
+            " border-radius: 6px; padding: 3px;"
+        )
+        main_layout.addWidget(self.status_label)
+
+        # --- Scroll area containing two-column layout ---
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        scroll_content = QWidget()
+        columns_layout = QHBoxLayout(scroll_content)
+        columns_layout.setContentsMargins(2, 2, 2, 2)
+        columns_layout.setSpacing(8)
+
+        self._row_widgets = {}
+
+        # Left column: control functions
+        left_group = QGroupBox("Controls")
+        left_group.setFont(QFont("sans-serif", 10, QFont.Bold))
+        left_grid = QGridLayout(left_group)
+        left_grid.setSpacing(3)
+        self._populate_grid(left_grid, FUNCTION_NAMES_CONTROLS)
+        columns_layout.addWidget(left_group, stretch=1)
+
+        # Right column: digit functions
+        right_group = QGroupBox("Digits")
+        right_group.setFont(QFont("sans-serif", 10, QFont.Bold))
+        right_grid = QGridLayout(right_group)
+        right_grid.setSpacing(3)
+        self._populate_grid(right_grid, FUNCTION_NAMES_DIGITS)
+        columns_layout.addWidget(right_group, stretch=1)
+
+        scroll.setWidget(scroll_content)
+        main_layout.addWidget(scroll, stretch=1)
+
+        # --- Bottom buttons ---
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(8)
+
+        save_btn = QPushButton("Save")
+        save_btn.setFont(QFont("sans-serif", 12))
+        save_btn.setMinimumHeight(38)
+        save_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(save_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setFont(QFont("sans-serif", 12))
+        cancel_btn.setMinimumHeight(38)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        main_layout.addLayout(btn_layout)
+
+        # Connect IR signal
+        self.ir_reader.scancode_received.connect(self._on_scancode)
+
+    def _populate_grid(self, grid, function_list):
+        """Populate a grid with function rows: label, scancode, learn, clear."""
+        grid.setColumnStretch(0, 3)
+        grid.setColumnStretch(1, 2)
+        grid.setColumnStretch(2, 1)
+        grid.setColumnStretch(3, 0)
+
+        for row_idx, fn in enumerate(function_list):
+            fn_label = QLabel(FUNCTION_LABELS.get(fn, fn))
+            fn_label.setFont(QFont("sans-serif", 10))
+            grid.addWidget(fn_label, row_idx, 0)
+
+            sc_str = self.reverse_map.get(fn, "—")
+            sc_label = QLabel(sc_str)
+            sc_label.setFont(QFont("monospace", 10))
+            sc_label.setAlignment(Qt.AlignCenter)
+            sc_label.setMinimumWidth(60)
+            sc_label.setStyleSheet(
+                "background-color: #fff; border: 1px solid #ddd;"
+                " border-radius: 3px; padding: 1px 4px;"
+            )
+            grid.addWidget(sc_label, row_idx, 1)
+
+            learn_btn = QPushButton("Learn")
+            learn_btn.setFont(QFont("sans-serif", 9))
+            learn_btn.setMinimumHeight(26)
+            learn_btn.clicked.connect(lambda checked, f=fn: self._start_listening(f))
+            grid.addWidget(learn_btn, row_idx, 2)
+
+            clear_btn = QPushButton("✕")
+            clear_btn.setFont(QFont("sans-serif", 9))
+            clear_btn.setFixedWidth(28)
+            clear_btn.setMinimumHeight(26)
+            clear_btn.setToolTip("Remove mapping")
+            clear_btn.clicked.connect(lambda checked, f=fn: self._clear_mapping(f))
+            grid.addWidget(clear_btn, row_idx, 3)
+
+            self._row_widgets[fn] = {
+                "fn_label": fn_label,
+                "sc_label": sc_label,
+                "learn_btn": learn_btn,
+                "clear_btn": clear_btn,
+            }
+
+    def _start_listening(self, function_name):
+        self._stop_listening()
+
+        self._listening_function = function_name
+        self._listen_start_time = time.monotonic()
+
+        label = FUNCTION_LABELS.get(function_name, function_name)
+        self.status_label.setText(f"⏳ Press remote button for: {label}")
+        self.status_label.setStyleSheet(
+            "color: #fff; background-color: #2a7ad5;"
+            " border-radius: 6px; padding: 3px;"
+        )
+
+        widgets = self._row_widgets.get(function_name)
+        if widgets:
+            widgets["learn_btn"].setStyleSheet(
+                "background-color: #2a7ad5; color: white; font-weight: bold;"
+            )
+
+        self._listen_timer.start(self._listen_timeout_ms)
+
+    def _stop_listening(self):
+        self._listen_timer.stop()
+
+        if self._listening_function:
+            widgets = self._row_widgets.get(self._listening_function)
+            if widgets:
+                widgets["learn_btn"].setStyleSheet("")
+
+            label = FUNCTION_LABELS.get(
+                self._listening_function, self._listening_function
+            )
+            self.status_label.setText(f"Timed out waiting for: {label}")
+            self.status_label.setStyleSheet(
+                "color: #fff; background-color: #888;"
+                " border-radius: 6px; padding: 3px;"
+            )
+
+        self._listening_function = None
+
+    @pyqtSlot(int)
+    def _on_scancode(self, scancode):
+        if self._listening_function is None:
+            return
+
+        elapsed_ms = (time.monotonic() - self._listen_start_time) * 1000
+        if elapsed_ms < self._listen_settle_ms:
+            return
+
+        fn = self._listening_function
+        sc_str = str(scancode)
+
+        # Resolve conflicts
+        conflict_fn = self.keymap.get(sc_str)
+        if conflict_fn and conflict_fn != fn:
+            del self.keymap[sc_str]
+            if conflict_fn in self.reverse_map:
+                del self.reverse_map[conflict_fn]
+            conflict_widgets = self._row_widgets.get(conflict_fn)
+            if conflict_widgets:
+                conflict_widgets["sc_label"].setText("—")
+
+        if fn in self.reverse_map:
+            old_sc = self.reverse_map[fn]
+            if old_sc in self.keymap:
+                del self.keymap[old_sc]
+
+        self.keymap[sc_str] = fn
+        self.reverse_map[fn] = sc_str
+
+        widgets = self._row_widgets.get(fn)
+        if widgets:
+            widgets["sc_label"].setText(sc_str)
+            widgets["learn_btn"].setStyleSheet("")
+
+        label = FUNCTION_LABELS.get(fn, fn)
+        self.status_label.setText(f"✓ Mapped scancode {scancode} → {label}")
+        self.status_label.setStyleSheet(
+            "color: #fff; background-color: #2e8b57;"
+            " border-radius: 6px; padding: 3px;"
+        )
+
+        self._listening_function = None
+        self._listen_timer.stop()
+
+    def _clear_mapping(self, function_name):
+        self._stop_listening()
+
+        if function_name in self.reverse_map:
+            sc_str = self.reverse_map[function_name]
+            if sc_str in self.keymap:
+                del self.keymap[sc_str]
+            del self.reverse_map[function_name]
+
+        widgets = self._row_widgets.get(function_name)
+        if widgets:
+            widgets["sc_label"].setText("—")
+
+        label = FUNCTION_LABELS.get(function_name, function_name)
+        self.status_label.setText(f"Cleared mapping for {label}")
+        self.status_label.setStyleSheet(
+            "color: #fff; background-color: #888;" " border-radius: 6px; padding: 3px;"
+        )
+
+    def get_keymap(self):
+        return dict(self.keymap)
+
+
+# ---------------------------------------------------------------------------
+# Settings Dialog
+# ---------------------------------------------------------------------------
+
+
+class SettingsDialog(QDialog):
+    """Touch-screen accessible settings for repeat timing, posture
+    duration, teach mode, and button testing."""
+
+    def __init__(self, config, keymap, ir_reader, parent=None):
+        super().__init__(parent)
+        self.config = dict(config)
+        self.keymap = dict(keymap)
+        self.ir_reader = ir_reader
+
+        self.setWindowTitle("SPAAC — Settings")
+        self.setModal(True)
+        self.setMinimumSize(620, 460)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(4)
+
+        title = QLabel("Settings")
+        title.setFont(QFont("sans-serif", 18, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        # --- Repeat delay ---
+        delay_label = QLabel("Repeat Delay (ms before repeat starts):")
+        delay_label.setFont(QFont("sans-serif", 11))
+        layout.addWidget(delay_label)
+
+        self.delay_slider = QSlider(Qt.Horizontal)
+        self.delay_slider.setMinimum(100)
+        self.delay_slider.setMaximum(2000)
+        self.delay_slider.setValue(self.config.get("repeat_delay_ms", 500))
+        self.delay_slider.setTickInterval(100)
+        self.delay_slider.setTickPosition(QSlider.TicksBelow)
+        layout.addWidget(self.delay_slider)
+
+        self.delay_value_label = QLabel(f"{self.delay_slider.value()} ms")
+        self.delay_value_label.setFont(QFont("sans-serif", 10))
+        self.delay_value_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.delay_value_label)
+        self.delay_slider.valueChanged.connect(
+            lambda v: self.delay_value_label.setText(f"{v} ms")
+        )
+
+        # --- Repeat rate ---
+        rate_label = QLabel("Repeat Rate (ms between repeats):")
+        rate_label.setFont(QFont("sans-serif", 11))
+        layout.addWidget(rate_label)
+
+        self.rate_slider = QSlider(Qt.Horizontal)
+        self.rate_slider.setMinimum(50)
+        self.rate_slider.setMaximum(1000)
+        self.rate_slider.setValue(self.config.get("repeat_rate_ms", 200))
+        self.rate_slider.setTickInterval(50)
+        self.rate_slider.setTickPosition(QSlider.TicksBelow)
+        layout.addWidget(self.rate_slider)
+
+        self.rate_value_label = QLabel(f"{self.rate_slider.value()} ms")
+        self.rate_value_label.setFont(QFont("sans-serif", 10))
+        self.rate_value_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.rate_value_label)
+        self.rate_slider.valueChanged.connect(
+            lambda v: self.rate_value_label.setText(f"{v} ms")
+        )
+
+        # --- Posture duration ---
+        posture_label = QLabel("Posture Display Duration (seconds, 0 = stays on):")
+        posture_label.setFont(QFont("sans-serif", 11))
+        layout.addWidget(posture_label)
+
+        self.posture_slider = QSlider(Qt.Horizontal)
+        self.posture_slider.setMinimum(0)
+        self.posture_slider.setMaximum(120)
+        self.posture_slider.setValue(self.config.get("posture_duration_sec", 0))
+        self.posture_slider.setTickInterval(5)
+        self.posture_slider.setTickPosition(QSlider.TicksBelow)
+        layout.addWidget(self.posture_slider)
+
+        posture_val = self.posture_slider.value()
+        self.posture_value_label = QLabel(
+            "Always on" if posture_val == 0 else f"{posture_val} sec"
+        )
+        self.posture_value_label.setFont(QFont("sans-serif", 10))
+        self.posture_value_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.posture_value_label)
+        self.posture_slider.valueChanged.connect(self._update_posture_label)
+
+        layout.addSpacerItem(QSpacerItem(20, 6))
+
+        # --- Action buttons row ---
+        action_layout = QHBoxLayout()
+
+        teach_btn = QPushButton("🎓  Teach Buttons")
+        teach_btn.setFont(QFont("sans-serif", 12))
+        teach_btn.setMinimumHeight(44)
+        teach_btn.clicked.connect(self._open_teach)
+        action_layout.addWidget(teach_btn)
+
+        test_btn = QPushButton("🔍  Test Buttons")
+        test_btn.setFont(QFont("sans-serif", 12))
+        test_btn.setMinimumHeight(44)
+        test_btn.clicked.connect(self._open_test)
+        action_layout.addWidget(test_btn)
+
+        layout.addLayout(action_layout)
+
+        layout.addSpacerItem(QSpacerItem(20, 6))
+
+        # --- Save / Cancel ---
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("Save")
+        ok_btn.setFont(QFont("sans-serif", 12))
+        ok_btn.setMinimumHeight(40)
+        ok_btn.clicked.connect(self._save)
+        btn_layout.addWidget(ok_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setFont(QFont("sans-serif", 12))
+        cancel_btn.setMinimumHeight(40)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _update_posture_label(self, value):
+        if value == 0:
+            self.posture_value_label.setText("Always on")
+        else:
+            self.posture_value_label.setText(f"{value} sec")
+
+    def _open_teach(self):
+        old_debounce = self.ir_reader.debounce_ms
+        self.ir_reader.debounce_ms = IRReader.DEFAULT_DEBOUNCE_MS
+
+        dlg = TeachDialog(self.ir_reader, self.keymap, parent=self)
+        if dlg.exec_() == QDialog.Accepted:
+            self.keymap = dlg.get_keymap()
+
+        self.ir_reader.debounce_ms = old_debounce
+
+    def _open_test(self):
+        old_debounce = self.ir_reader.debounce_ms
+        self.ir_reader.debounce_ms = IRReader.DEFAULT_DEBOUNCE_MS
+
+        dlg = TestButtonDialog(self.ir_reader, self.keymap, parent=self)
+        dlg.exec_()
+
+        self.ir_reader.debounce_ms = old_debounce
+
+    def _save(self):
+        self.config["repeat_delay_ms"] = self.delay_slider.value()
+        self.config["repeat_rate_ms"] = self.rate_slider.value()
+        self.config["posture_duration_sec"] = self.posture_slider.value()
+        self.accept()
+
+    def get_config(self):
+        return dict(self.config)
+
+    def get_keymap(self):
+        return dict(self.keymap)
+
+
+# ---------------------------------------------------------------------------
+# Main Display Window
+# ---------------------------------------------------------------------------
+
+
+class MainDisplay(QMainWindow):
+    """
+    Full-screen display showing:
+      - Current page number (large, centered)
+      - Posture cue (stand / sit / kneel) with optional auto-clear
+      - Page-entry overlay when dialing digits
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        self.config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+        for k, v in DEFAULT_CONFIG.items():
+            if k not in self.config:
+                self.config[k] = v
+
+        self.keymap = load_json(KEYMAP_FILE, {})
+
+        # State
+        self.current_page = 1
+        self.posture = POSTURE_NONE
+        self.dialing_digits = ""
+        self.is_dialing = False
+        self._settings_open = False
+
+        # Repeat controller
+        self.repeat_ctrl = RepeatController(
+            self.config, lookup_fn=self._lookup_function
+        )
+
+        # IR reader
+        self.ir_reader = IRReader(self.config)
+        self.ir_reader.scancode_received.connect(self._on_scancode)
+        self.ir_reader.debounce_ms = 50
+
+        # Build UI
+        self._build_ui()
+
+        # Start IR reader
+        self.ir_reader.start()
+
+        # Dial timeout timer
+        self.dial_timer = QTimer()
+        self.dial_timer.setSingleShot(True)
+        self.dial_timer.timeout.connect(self._cancel_dial)
+
+        # Posture auto-clear timer
+        self.posture_timer = QTimer()
+        self.posture_timer.setSingleShot(True)
+        self.posture_timer.timeout.connect(self._clear_posture)
+
+    def _build_ui(self):
+        self.setWindowTitle("SPAAC Page Display")
+
+        book_color = self.config.get("book_color", "#1a3a5c")
+        text_color = self.config.get("text_color", "#f0e6c8")
+
+        central = QWidget()
+        self.setCentralWidget(central)
+        central.setStyleSheet(f"background-color: {book_color};")
+
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(20, 10, 20, 10)
+
+        # --- Posture label (top) ---
+        self.posture_label = QLabel("")
+        self.posture_label.setFont(QFont("sans-serif", 36, QFont.Bold))
+        self.posture_label.setAlignment(Qt.AlignCenter)
+        self.posture_label.setStyleSheet(f"color: {text_color};")
+        self.posture_label.setMinimumHeight(60)
+        layout.addWidget(self.posture_label, stretch=1)
+
+        # --- Page number (center, dominant) ---
+        self.page_label = QLabel("1")
+        self.page_label.setFont(QFont("sans-serif", 180, QFont.Bold))
+        self.page_label.setAlignment(Qt.AlignCenter)
+        self.page_label.setStyleSheet(f"color: {text_color};")
+        layout.addWidget(self.page_label, stretch=6)
+
+        # --- Dial overlay label ---
+        self.dial_label = QLabel("")
+        self.dial_label.setFont(QFont("sans-serif", 28))
+        self.dial_label.setAlignment(Qt.AlignCenter)
+        self.dial_label.setStyleSheet(
+            "color: #ffffff; background-color: rgba(0,0,0,0.6);"
+            " border-radius: 12px; padding: 10px;"
+        )
+        self.dial_label.setVisible(False)
+        self.dial_label.setMinimumHeight(50)
+        layout.addWidget(self.dial_label, stretch=1)
+
+        # --- Settings button (small, bottom-right, touch accessible) ---
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addStretch()
+        self.settings_btn = QPushButton("⚙")
+        self.settings_btn.setFont(QFont("sans-serif", 18))
+        self.settings_btn.setFixedSize(50, 50)
+        self.settings_btn.setStyleSheet(
+            "QPushButton { background-color: rgba(255,255,255,0.15);"
+            " color: #ccc; border: 1px solid #555; border-radius: 8px; }"
+            " QPushButton:pressed { background-color: rgba(255,255,255,0.3); }"
+        )
+        self.settings_btn.clicked.connect(self._open_settings)
+        bottom_layout.addWidget(self.settings_btn)
+        layout.addLayout(bottom_layout)
+
+        self.showFullScreen()
+
+    def _update_display(self):
+        book_color = self.config.get("book_color", "#1a3a5c")
+        text_color = self.config.get("text_color", "#f0e6c8")
+
+        self.centralWidget().setStyleSheet(f"background-color: {book_color};")
+
+        self.page_label.setText(str(self.current_page))
+        self.page_label.setStyleSheet(f"color: {text_color};")
+
+        posture_text = POSTURE_SYMBOLS.get(self.posture, "")
+        self.posture_label.setText(posture_text)
+
+        if self.posture == POSTURE_STAND:
+            pc = self.config.get("posture_stand_color", "#c8a84e")
+        elif self.posture == POSTURE_SIT:
+            pc = self.config.get("posture_sit_color", "#6b8f6b")
+        elif self.posture == POSTURE_KNEEL:
+            pc = self.config.get("posture_kneel_color", "#8b5e3c")
+        else:
+            pc = text_color
+
+        self.posture_label.setStyleSheet(f"color: {pc}; font-weight: bold;")
+
+    def _lookup_function(self, scancode):
+        return self.keymap.get(str(scancode), None)
+
+    @pyqtSlot(int)
+    def _on_scancode(self, scancode):
+        if self._settings_open:
+            return
+
+        fn = self._lookup_function(scancode)
+        if fn is None:
+            return
+
+        if not self.repeat_ctrl.should_accept(scancode):
+            return
+
+        self._dispatch(fn)
+
+    def _dispatch(self, fn):
+        if fn == "page_up":
+            self._change_page(1)
+        elif fn == "page_down":
+            self._change_page(-1)
+        elif fn == "stand":
+            self._set_posture(POSTURE_STAND)
+        elif fn == "sit":
+            self._set_posture(POSTURE_SIT)
+        elif fn == "kneel":
+            self._set_posture(POSTURE_KNEEL)
+        elif fn.startswith("digit_"):
+            digit = fn[-1]
+            self._dial_digit(digit)
+        elif fn == "enter":
+            self._accept_dial()
+        elif fn == "cancel":
+            self._cancel_dial()
+        elif fn == "backspace":
+            self._backspace_dial()
+        elif fn == "setup":
+            self._open_settings()
+
+    def _change_page(self, delta):
+        if self.is_dialing:
+            self._cancel_dial()
+        min_p = self.config.get("min_page", 1)
+        max_p = self.config.get("max_page", 999)
+        self.current_page = max(min_p, min(max_p, self.current_page + delta))
+        self._update_display()
+
+    def _set_posture(self, posture):
+        self.posture_timer.stop()
+
+        if self.posture == posture:
+            self.posture = POSTURE_NONE
+        else:
+            self.posture = posture
+
+            duration = self.config.get("posture_duration_sec", 0)
+            if duration > 0:
+                self.posture_timer.start(duration * 1000)
+
+        self._update_display()
+
+    def _clear_posture(self):
+        self.posture = POSTURE_NONE
+        self._update_display()
+
+    def _dial_digit(self, digit):
+        if not self.is_dialing:
+            self.is_dialing = True
+            self.dialing_digits = ""
+
+        if len(self.dialing_digits) < 4:
+            self.dialing_digits += digit
+
+        self.dial_label.setText(f"Go to page: {self.dialing_digits}_")
+        self.dial_label.setVisible(True)
+
+        self.dial_timer.start(8000)
+
+    def _accept_dial(self):
+        if not self.is_dialing or not self.dialing_digits:
+            self._cancel_dial()
+            return
+
+        try:
+            page = int(self.dialing_digits)
+        except ValueError:
+            self._cancel_dial()
+            return
+
+        min_p = self.config.get("min_page", 1)
+        max_p = self.config.get("max_page", 999)
+        page = max(min_p, min(max_p, page))
+
+        self.current_page = page
+        self.is_dialing = False
+        self.dialing_digits = ""
+        self.dial_label.setVisible(False)
+        self.dial_timer.stop()
+        self._update_display()
+
+    def _cancel_dial(self):
+        self.is_dialing = False
+        self.dialing_digits = ""
+        self.dial_label.setVisible(False)
+        self.dial_timer.stop()
+
+    def _backspace_dial(self):
+        if not self.is_dialing or not self.dialing_digits:
+            self._cancel_dial()
+            return
+
+        self.dialing_digits = self.dialing_digits[:-1]
+
+        if not self.dialing_digits:
+            self._cancel_dial()
+            return
+
+        self.dial_label.setText(f"Go to page: {self.dialing_digits}_")
+        self.dial_timer.start(8000)
+
+    def _open_settings(self):
+        if self._settings_open:
+            return
+
+        self._settings_open = True
+
+        dlg = SettingsDialog(self.config, self.keymap, self.ir_reader, parent=self)
+        if dlg.exec_() == QDialog.Accepted:
+            self.config = dlg.get_config()
+            self.keymap = dlg.get_keymap()
+
+            self.repeat_ctrl = RepeatController(
+                self.config, lookup_fn=self._lookup_function
+            )
+
+            save_json(CONFIG_FILE, self.config)
+            save_json(KEYMAP_FILE, self.keymap)
+
+            self._update_display()
+
+        self._settings_open = False
+
+    def closeEvent(self, event):
+        self.ir_reader.stop()
+        save_json(CONFIG_FILE, self.config)
+        save_json(KEYMAP_FILE, self.keymap)
+        super().closeEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.close()
+        super().keyPressEvent(event)
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+def main():
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    app = QApplication(sys.argv)
+
+    # Hide cursor for kiosk mode
+    app.setOverrideCursor(Qt.BlankCursor)
+
+    window = MainDisplay()
+    window._update_display()
+
+    sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()
