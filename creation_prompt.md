@@ -1,0 +1,38 @@
+# Page display for SPAAC
+
+2026-03-02
+
+Create an electronic display to show the congregation the current page
+number (in the blue book) at church. Also show when congregation should
+stand, sit, or kneel.  A member of the congregation will hold the TV
+remote that directs the page number on the screen.
+
+Implement using RaspberryPi with 7" touch-screen display, IR receiver,
+and TV remote.  IR receiver should be packaged to avoid damage.
+
+Build a Python app using evdev package and either PyQt (preferred) or Tkinter.
+
+Normal display should be full screen with page numbers clearly visible
+from the back of the church.  Background color can be same as the book.
+
+App should have a setup mode (accessible from touch screen) to control
+button repetition  (delay before repeat, maximum repeats/second).  Also
+need a teach mode for app to map buttons on the remote to app functions.
+
+RPi should startup and launch the app directly.  No need for WiFi, or
+other KVM inputs.
+
+description                 | IR remote signal
+------------                | -----------
+increment to next page      | RIGHT button
+decrement to previous page  | LEFT button
+congregation should stand   | UP button
+congregation should sit     | DOWN button
+congregation should kneel   |
+dial in page number         | number buttons
+accept new page number      | ENTER button
+cancel page number change   | LAST button or STOP button
+setup and training          | SETUP button
+
+Empirical observation: Using `evdev` in a demo app, only `EV_MSC` and `EV_SYN`
+(no `EV_KEY`) events were received.
