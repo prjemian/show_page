@@ -135,6 +135,7 @@ def save_json(path, data):
 class IRReader(QtCore.QObject):
     """
     Reads raw IR scancodes from evdev input device.
+
     Emits scancode_received(int) for each EV_MSC / MSC_SCAN event.
     Includes built-in debounce so that held buttons don't flood
     downstream consumers (especially Teach Mode).
@@ -145,6 +146,7 @@ class IRReader(QtCore.QObject):
     DEFAULT_DEBOUNCE_MS = 500
 
     def __init__(self, config, parent=None):
+        """Initialize IRReader with the given configuration dict."""
         super().__init__(parent)
         self.config = config
         self._running = False
@@ -156,10 +158,12 @@ class IRReader(QtCore.QObject):
 
     @property
     def debounce_ms(self):
+        """Minimum milliseconds between successive emissions of the same scancode."""
         return self._debounce_ms
 
     @debounce_ms.setter
     def debounce_ms(self, value):
+        """Set debounce interval, clamped to a minimum of 0 ms."""
         self._debounce_ms = max(0, value)
 
     def find_ir_device(self):
@@ -171,11 +175,13 @@ class IRReader(QtCore.QObject):
         return None
 
     def start(self):
+        """Start the background reader thread."""
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
     def stop(self):
+        """Signal the reader thread to stop and close the input device."""
         self._running = False
         if self._device:
             try:
@@ -184,6 +190,7 @@ class IRReader(QtCore.QObject):
                 pass
 
     def _run(self):
+        """Main loop: find device, read EV_MSC/MSC_SCAN events, emit scancodes."""
         while self._running:
             if self._device is None:
                 self._device = self.find_ir_device()
@@ -207,6 +214,7 @@ class IRReader(QtCore.QObject):
                 time.sleep(2)
 
     def _debounced_emit(self, scancode):
+        """Emit scancode_received only if debounce interval has elapsed."""
         now = time.monotonic()
         interval = self._debounce_ms / 1000.0
 
@@ -236,6 +244,13 @@ class RepeatController:
     REPEATABLE_FUNCTIONS = {"page_up", "page_down"}
 
     def __init__(self, config, lookup_fn=None):
+        """
+        Initialize RepeatController.
+
+        Args:
+            config: Configuration dict with repeat_delay_ms and repeat_rate_ms.
+            lookup_fn: Callable mapping scancode (int) to function name (str) or None.
+        """
         self.config = config
         self._lookup_fn = lookup_fn
         self._last_scancode = None
@@ -243,6 +258,12 @@ class RepeatController:
         self._last_accepted = 0.0
 
     def should_accept(self, scancode):
+        """
+        Return True if this scancode event should be dispatched.
+
+        Applies repeat-delay and repeat-rate logic for repeatable functions,
+        and a single-fire gap for all other functions.
+        """
         now = time.monotonic()
 
         fn = self._lookup_fn(scancode) if self._lookup_fn else None
@@ -277,6 +298,7 @@ class RepeatController:
             return True
 
     def reset(self):
+        """Clear the last-seen scancode, forcing the next event to be treated as a new press."""
         self._last_scancode = None
 
 
@@ -292,6 +314,14 @@ class TestButtonDialog(QtWidgets.QDialog):
     """
 
     def __init__(self, ir_reader, keymap, parent=None):
+        """
+        Initialize TestButtonDialog.
+
+        Args:
+            ir_reader: IRReader instance providing scancode_received signal.
+            keymap: Dict mapping scancode strings to function names.
+            parent: Optional parent QWidget.
+        """
         super().__init__(parent)
         self.ir_reader = ir_reader
         self.keymap = keymap
@@ -356,6 +386,7 @@ class TestButtonDialog(QtWidgets.QDialog):
 
     @QtCore.pyqtSlot(int)
     def _on_scancode(self, scancode):
+        """Update the UI to show the received scancode and its mapped function name."""
         sc_str = str(scancode)
         self.scancode_label.setText(f"Scancode: {scancode}")
 
@@ -390,6 +421,14 @@ class TeachDialog(QtWidgets.QDialog):
     """
 
     def __init__(self, ir_reader, current_keymap, parent=None):
+        """
+        Initialize TeachDialog.
+
+        Args:
+            ir_reader: IRReader instance providing scancode_received signal.
+            current_keymap: Dict mapping scancode strings to function names.
+            parent: Optional parent QWidget.
+        """
         super().__init__(parent)
         self.ir_reader = ir_reader
         self.keymap = dict(current_keymap)
@@ -551,6 +590,7 @@ class TeachDialog(QtWidgets.QDialog):
             }
 
     def _start_listening(self, function_name):
+        """Begin listening for a remote button press to assign to function_name."""
         self._stop_listening()
 
         self._listening_function = function_name
@@ -572,6 +612,7 @@ class TeachDialog(QtWidgets.QDialog):
         self._listen_timer.start(self._listen_timeout_ms)
 
     def _stop_listening(self):
+        """Cancel the active listening session and update the status label."""
         self._listen_timer.stop()
 
         if self._listening_function:
@@ -592,6 +633,7 @@ class TeachDialog(QtWidgets.QDialog):
 
     @QtCore.pyqtSlot(int)
     def _on_scancode(self, scancode):
+        """Record a scancode mapping when a remote button is pressed during listening."""
         if self._listening_function is None:
             return
 
@@ -636,6 +678,7 @@ class TeachDialog(QtWidgets.QDialog):
         self._listen_timer.stop()
 
     def _clear_mapping(self, function_name):
+        """Remove the scancode mapping for the given function and update the UI."""
         self._stop_listening()
 
         if function_name in self.reverse_map:
@@ -657,6 +700,7 @@ class TeachDialog(QtWidgets.QDialog):
         )
 
     def _clear_all_mappings(self):
+        """Remove all scancode-to-function mappings and reset all scancode labels."""
         self._stop_listening()
 
         self.keymap.clear()
@@ -672,6 +716,7 @@ class TeachDialog(QtWidgets.QDialog):
         )
 
     def get_keymap(self):
+        """Return a copy of the current scancode-to-function mapping dict."""
         return dict(self.keymap)
 
 
@@ -685,6 +730,15 @@ class SettingsDialog(QtWidgets.QDialog):
     duration, teach mode, and button testing."""
 
     def __init__(self, config, keymap, ir_reader, parent=None):
+        """
+        Initialize SettingsDialog.
+
+        Args:
+            config: Configuration dict with timing and color values.
+            keymap: Dict mapping scancode strings to function names.
+            ir_reader: IRReader instance, passed to Teach/Test sub-dialogs.
+            parent: Optional parent QWidget.
+        """
         super().__init__(parent)
         self.config = dict(config)
         self.keymap = dict(keymap)
@@ -810,12 +864,14 @@ class SettingsDialog(QtWidgets.QDialog):
         layout.addLayout(btn_layout)
 
     def _update_posture_label(self, value):
+        """Update the posture duration label to show 'Always on' or the value in seconds."""
         if value == 0:
             self.posture_value_label.setText("Always on")
         else:
             self.posture_value_label.setText(f"{value} sec")
 
     def _open_teach(self):
+        """Open the TeachDialog, temporarily resetting debounce to the default value."""
         old_debounce = self.ir_reader.debounce_ms
         self.ir_reader.debounce_ms = IRReader.DEFAULT_DEBOUNCE_MS
 
@@ -826,6 +882,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.ir_reader.debounce_ms = old_debounce
 
     def _open_test(self):
+        """Open the TestButtonDialog, temporarily resetting debounce to the default value."""
         old_debounce = self.ir_reader.debounce_ms
         self.ir_reader.debounce_ms = IRReader.DEFAULT_DEBOUNCE_MS
 
@@ -835,15 +892,18 @@ class SettingsDialog(QtWidgets.QDialog):
         self.ir_reader.debounce_ms = old_debounce
 
     def _save(self):
+        """Collect slider values into config and accept the dialog."""
         self.config["repeat_delay_ms"] = self.delay_slider.value()
         self.config["repeat_rate_ms"] = self.rate_slider.value()
         self.config["posture_duration_sec"] = self.posture_slider.value()
         self.accept()
 
     def get_config(self):
+        """Return a copy of the current configuration dict."""
         return dict(self.config)
 
     def get_keymap(self):
+        """Return a copy of the current scancode-to-function mapping dict."""
         return dict(self.keymap)
 
 
@@ -861,6 +921,7 @@ class MainDisplay(QtWidgets.QMainWindow):
     """
 
     def __init__(self):
+        """Initialize the main display window, load config and keymap, and start IR reader."""
         super().__init__()
 
         # Compute scale factor based on screen height (base: 600 for 7-inch display)
@@ -910,6 +971,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.posture_timer.timeout.connect(self._clear_posture)
 
     def _build_ui(self):
+        """Construct and lay out all widgets for the full-screen display."""
         self.setWindowTitle("SPAAC Page Display")
 
         book_color = self.config.get("book_color", "#1a3a5c")
@@ -932,13 +994,13 @@ class MainDisplay(QtWidgets.QMainWindow):
 
         # --- Page number and dial overlay (stacked, center, dominant) ---
         stacked = QtWidgets.QStackedWidget()
-        
+
         self.page_label = QtWidgets.QLabel("1")
         self.page_label.setFont(QtGui.QFont("sans-serif", int(180 * self.scale_factor), QtGui.QFont.Bold))
         self.page_label.setAlignment(QtCore.Qt.AlignCenter)
         self.page_label.setStyleSheet(f"color: {text_color};")
         stacked.addWidget(self.page_label)
-        
+
         self.dial_label = QtWidgets.QLabel("")
         self.dial_label.setFont(QtGui.QFont("sans-serif", int(180 * self.scale_factor), QtGui.QFont.Bold))
         self.dial_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -949,7 +1011,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         stacked.addWidget(self.dial_label)
         stacked.setCurrentIndex(0)  # Start with page_label visible
         self.stacked = stacked
-        
+
         layout.addWidget(stacked, stretch=6)
 
         # --- Settings button (small, bottom-right, touch accessible) ---
@@ -970,6 +1032,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.showFullScreen()
 
     def _update_display(self):
+        """Refresh the page number, background color, and posture label from current state."""
         book_color = self.config.get("book_color", "#1a3a5c")
         text_color = self.config.get("text_color", "#f0e6c8")
 
@@ -993,10 +1056,12 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.posture_label.setStyleSheet(f"color: {pc}; font-weight: bold;")
 
     def _lookup_function(self, scancode):
+        """Return the function name mapped to scancode, or None if unmapped."""
         return self.keymap.get(str(scancode), None)
 
     @QtCore.pyqtSlot(int)
     def _on_scancode(self, scancode):
+        """Handle a raw scancode from IRReader: look up the function and dispatch it."""
         if self._settings_open:
             return
 
@@ -1010,6 +1075,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self._dispatch(fn)
 
     def _dispatch(self, fn):
+        """Route a logical function name to the appropriate handler method."""
         if fn == "page_up":
             self._change_page(1)
         elif fn == "page_down":
@@ -1033,6 +1099,7 @@ class MainDisplay(QtWidgets.QMainWindow):
             self._open_settings()
 
     def _change_page(self, delta):
+        """Increment or decrement the current page by delta, clamped to configured bounds."""
         if self.is_dialing:
             self._cancel_dial()
         min_p = self.config.get("min_page", 1)
@@ -1041,6 +1108,11 @@ class MainDisplay(QtWidgets.QMainWindow):
         self._update_display()
 
     def _set_posture(self, posture):
+        """
+        Set the displayed posture cue, toggling it off if already active.
+
+        Starts the auto-clear timer when posture_duration_sec is nonzero.
+        """
         self.posture_timer.stop()
 
         if self.posture == posture:
@@ -1055,10 +1127,12 @@ class MainDisplay(QtWidgets.QMainWindow):
         self._update_display()
 
     def _clear_posture(self):
+        """Clear the posture cue (called by the auto-clear timer)."""
         self.posture = POSTURE_NONE
         self._update_display()
 
     def _dial_digit(self, digit):
+        """Append digit to the dialing buffer and show the dial overlay."""
         if not self.is_dialing:
             self.is_dialing = True
             self.dialing_digits = ""
@@ -1072,6 +1146,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.dial_timer.start(8000)
 
     def _accept_dial(self):
+        """Commit the dialed digits as the new current page and hide the dial overlay."""
         if not self.is_dialing or not self.dialing_digits:
             self._cancel_dial()
             return
@@ -1094,12 +1169,14 @@ class MainDisplay(QtWidgets.QMainWindow):
         self._update_display()
 
     def _cancel_dial(self):
+        """Discard the dialing buffer and hide the dial overlay."""
         self.is_dialing = False
         self.dialing_digits = ""
         self.stacked.setCurrentIndex(0)  # Show page_label
         self.dial_timer.stop()
 
     def _backspace_dial(self):
+        """Remove the last digit from the dialing buffer, cancelling if it becomes empty."""
         if not self.is_dialing or not self.dialing_digits:
             self._cancel_dial()
             return
@@ -1114,6 +1191,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.dial_timer.start(8000)
 
     def _open_settings(self):
+        """Open the SettingsDialog and apply any changes to config, keymap, and display."""
         if self._settings_open:
             return
 
@@ -1136,12 +1214,14 @@ class MainDisplay(QtWidgets.QMainWindow):
         self._settings_open = False
 
     def closeEvent(self, event):
+        """Stop the IR reader and persist config/keymap on window close."""
         self.ir_reader.stop()
         save_json(CONFIG_FILE, self.config)
         save_json(KEYMAP_FILE, self.keymap)
         super().closeEvent(event)
 
     def keyPressEvent(self, event):
+        """Close the window when Escape is pressed."""
         if event.key() == QtCore.Qt.Key_Escape:
             self.close()
         super().keyPressEvent(event)
@@ -1153,6 +1233,7 @@ class MainDisplay(QtWidgets.QMainWindow):
 
 
 def main():
+    """Create the Qt application, show the full-screen display, and enter the event loop."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
     app = QtWidgets.QApplication(sys.argv)
