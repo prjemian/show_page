@@ -893,15 +893,14 @@ class MainDisplay(QtWidgets.QMainWindow):
 
         # --- Dial overlay label ---
         self.dial_label = QtWidgets.QLabel("")
-        self.dial_label.setFont(QtGui.QFont("sans-serif", 28))
+        self.dial_label.setFont(QtGui.QFont("sans-serif", 180, QtGui.QFont.Bold))
         self.dial_label.setAlignment(QtCore.Qt.AlignCenter)
         self.dial_label.setStyleSheet(
-            "color: #ffffff; background-color: rgba(0,0,0,0.6);"
+            "color: #ffffff; background-color: rgba(0,0,0,0.8);"
             " border-radius: 12px; padding: 10px;"
         )
         self.dial_label.setVisible(False)
-        self.dial_label.setMinimumHeight(50)
-        layout.addWidget(self.dial_label, stretch=1)
+        layout.addWidget(self.dial_label, stretch=6)
 
         # --- Settings button (small, bottom-right, touch accessible) ---
         bottom_layout = QtWidgets.QHBoxLayout()
@@ -1017,7 +1016,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         if len(self.dialing_digits) < 4:
             self.dialing_digits += digit
 
-        self.dial_label.setText(f"Select page: {self.dialing_digits}_")
+        self.dial_label.setText(self.dialing_digits)
         self.dial_label.setVisible(True)
 
         self.dial_timer.start(8000)
@@ -1061,7 +1060,7 @@ class MainDisplay(QtWidgets.QMainWindow):
             self._cancel_dial()
             return
 
-        self.dial_label.setText(f"Select page: {self.dialing_digits}_")
+        self.dial_label.setText(self.dialing_digits)
         self.dial_timer.start(8000)
 
     def _open_settings(self):
