@@ -301,7 +301,7 @@ class TestButtonDialog(QtWidgets.QDialog):
         screen = QtWidgets.QApplication.primaryScreen()
         screen_size = screen.size()
         self.screen_height = screen_size.height()
-        self.scale_factor = self.screen_height / 600.0
+        self.scale_factor = min((self.screen_height / 600.0) ** 0.7, 1.5)
 
         self.setWindowTitle("SPAAC — Test Remote Buttons")
         self.setModal(True)
@@ -402,7 +402,7 @@ class TeachDialog(QtWidgets.QDialog):
         screen = QtWidgets.QApplication.primaryScreen()
         screen_size = screen.size()
         self.screen_height = screen_size.height()
-        self.scale_factor = self.screen_height / 600.0
+        self.scale_factor = min((self.screen_height / 600.0) ** 0.7, 1.5)
 
         self.setWindowTitle("SPAAC — Teach Remote Buttons")
         self.setModal(True)
@@ -695,7 +695,7 @@ class SettingsDialog(QtWidgets.QDialog):
         screen = QtWidgets.QApplication.primaryScreen()
         screen_size = screen.size()
         self.screen_height = screen_size.height()
-        self.scale_factor = self.screen_height / 600.0
+        self.scale_factor = min((self.screen_height / 600.0) ** 0.7, 1.5)
 
         self.setWindowTitle("SPAAC — Settings")
         self.setModal(True)
@@ -868,7 +868,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         screen = QtWidgets.QApplication.primaryScreen()
         screen_size = screen.size()
         self.screen_height = screen_size.height()
-        self.scale_factor = self.screen_height / 600.0
+        self.scale_factor = min((self.screen_height / 600.0) ** 0.7, 1.5)
 
         self.config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
         for k, v in DEFAULT_CONFIG.items():
@@ -944,8 +944,8 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.dial_label.setFont(QtGui.QFont("sans-serif", int(180 * self.scale_factor), QtGui.QFont.Bold))
         self.dial_label.setAlignment(QtCore.Qt.AlignCenter)
         self.dial_label.setStyleSheet(
-            "color: #ffffff; background-color: rgba(0,0,0,0.8);"
-            " border-radius: 12px; padding: 10px;"
+            f"color: #ffffff; background-color: rgba(0,0,0,0.8);"
+            f" border-radius: {int(12 * self.scale_factor)}px; padding: {int(10 * self.scale_factor)}px;"
         )
         stacked.addWidget(self.dial_label)
         stacked.setCurrentIndex(0)  # Start with page_label visible
@@ -957,8 +957,8 @@ class MainDisplay(QtWidgets.QMainWindow):
         bottom_layout = QtWidgets.QHBoxLayout()
         bottom_layout.addStretch()
         self.settings_btn = QtWidgets.QPushButton("⚙")
-        self.settings_btn.setFont(QtGui.QFont("sans-serif", int(18 * self.scale_factor)))
-        self.settings_btn.setFixedSize(int(50 * self.scale_factor), int(50 * self.scale_factor))
+        self.settings_btn.setFont(QtGui.QFont("sans-serif", 18))
+        self.settings_btn.setFixedSize(50, 50)
         self.settings_btn.setStyleSheet(
             "QPushButton { background-color: rgba(255,255,255,0.15);"
             " color: #ccc; border: 1px solid #555; border-radius: 8px; }"
