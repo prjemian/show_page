@@ -1,47 +1,34 @@
 # SPAAC Show Page Number
 
 Electronic display to show the congregation the current page number.
-Also show when is is appropriate to stand, sit, or kneel.  A TV
+Also show when it is appropriate to stand, sit, or kneel.  A TV
 remote directs the page number on the screen.
 
-Implement using RaspberryPi with 7" touch-screen display, IR receiver,
-and TV remote.  IR receiver should be packaged to avoid damage.
+Implemented with a Raspberry Pi, 7" touchscreen display, IR receiver,
+and a standard TV remote.
 
-Normal display should be full screen with page numbers clearly visible
-from the back of the church.  Background color can be same as the book.
+## Quick Start
 
-App should have a setup mode (accessible from touch screen) to control
-button repetition  (delay before repeat, maximum repeats/second).  Also
-need a teach mode for app to map buttons on the remote to app functions.
+1. Follow the [Installation Guide](docs/installation_guide.md) to assemble
+   the hardware, flash the Pi, and deploy the software.
+2. After first boot, open the Settings dialog (⚙ button, lower-right corner)
+   and use **Teach Buttons** to map your TV remote's buttons to functions.
+3. See the [User Guide](docs/user_guide.md) for day-to-day operation.
+4. If something does not work, see the [Troubleshooting Guide](docs/troubleshooting.md).
 
-RPi should startup and launch the app directly.  No need for WiFi, or
-other KVM inputs.
+## Documentation
 
-## Install wallpaper
+| Document | Description |
+|----------|-------------|
+| [User Guide](docs/user_guide.md) | How to operate the display and remote |
+| [Installation Guide](docs/installation_guide.md) | Parts list, hardware assembly, OS setup, service configuration |
+| [Troubleshooting Guide](docs/troubleshooting.md) | Diagnosing IR receiver, service, and display problems |
 
-Change the stock background image.
+## Source Files
 
-### Newer RPi models an OS
+| File | Description |
+|------|-------------|
+| `spaac_display.py` | Main Python application (PyQt5 + evdev) |
+| `spaac.service` | systemd service unit — copy to `/etc/systemd/system/` |
+| `Ararat-and-Khor-Virap.png` | Desktop wallpaper image |
 
-Using the touchscreen, click through these menus:
-
-- Raspberry
-- Preferences
-- Control Centre
-- Desktop
-- Picture
-- navigate the file dialog to the new image
-
-### Older RPi using LXDE
-
-Edit  ...
-
-```bash
-nano ~/.config/pcmanfm/LXDE-pi/desktop-items-0.conf
-```
-
-change this line:
-
-```ini
-wallpaper=/home/pi/Documents/show_page/Ararat-and-Khor-Virap.png
-```
