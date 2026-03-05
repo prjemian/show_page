@@ -1,3 +1,5 @@
+# copy to: /etc/systemd/system/spaac.service
+
 [Unit]
 Description=SPAAC Page Display
 After=graphical.target
@@ -9,7 +11,7 @@ User=pi
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/pi/.Xauthority
 ExecStartPre=/bin/sleep 5
-ExecStart=/usr/bin/python3 /home/pi/Documents/spaac_display.py
+ExecStart=/usr/bin/python3 /home/pi/Documents/show_page/spaac_display.py
 Restart=always
 RestartSec=5
 
