@@ -470,6 +470,14 @@ class TeachDialog(QtWidgets.QDialog):
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.setSpacing(8)
 
+        clear_all_btn = QtWidgets.QPushButton("Clear All")
+        clear_all_btn.setFont(QtGui.QFont("sans-serif", 12))
+        clear_all_btn.setMinimumHeight(38)
+        clear_all_btn.clicked.connect(self._clear_all_mappings)
+        btn_layout.addWidget(clear_all_btn)
+
+        btn_layout.addStretch()
+
         save_btn = QtWidgets.QPushButton("Save")
         save_btn.setFont(QtGui.QFont("sans-serif", 12))
         save_btn.setMinimumHeight(38)
@@ -634,6 +642,21 @@ class TeachDialog(QtWidgets.QDialog):
         self.status_label.setStyleSheet(
             "color: #fff; background-color: #888;"
             #
+            " border-radius: 6px; padding: 3px;"
+        )
+
+    def _clear_all_mappings(self):
+        self._stop_listening()
+
+        self.keymap.clear()
+        self.reverse_map.clear()
+
+        for fn, widgets in self._row_widgets.items():
+            widgets["sc_label"].setText("—")
+
+        self.status_label.setText("✓ Cleared all mappings")
+        self.status_label.setStyleSheet(
+            "color: #fff; background-color: #2e8b57;"
             " border-radius: 6px; padding: 3px;"
         )
 
