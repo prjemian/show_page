@@ -50,12 +50,13 @@ button in the lower corner).
 
 ## Icons for stand, site, kneel
 
-- [ ] TODO: Replace stand, kneel, ... text with language-independent, high-contrast image.
-  - [ ] stick figure, high-contrast, use as icon
-    - [ ] Person kneeling, appears below middle of screen on right side
-    - [ ] Person sitting, appears at middle of screen on right side
-    - [ ] Person standing, appears above middle of screen on right side
+- [ ] TODO: Replace stand, kneel, ... text with posture icons
+  - [ ] PNG files in docs subdirectory
+  - [ ] kneel: appears below middle of screen on right side
+  - [ ] sit: appears at middle of screen on right side
+  - [ ] stand: appears above middle of screen on right side
   - [ ] Rearrange display so image appears to right of numbers.
+  - [ ] Does not block settings icon
   - [ ] Visible per 10 foot interface.
   - [ ] Increase (maximize) size of displayed page numbers to fit space, with border.
 - [x] Make various color choices configurable, keep the defaults.
