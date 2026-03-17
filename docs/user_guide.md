@@ -10,12 +10,14 @@ display is controlled by a TV remote held by an altar server.
 
 In normal operation the screen shows:
 
-- **Page number** — large digits centered on a dark blue background, readable from
-  the back of the church.
-- **Posture cue** — when active, a line of text appears above the page number
-  (e.g., "PLEASE STAND") in a distinct color.
+- **Page number** — large digits on the left portion of the screen, with a subtle
+  border, readable from the back of the church.
+- **Posture icon** — when active, a stick-figure icon appears on the right side of
+  the screen.  The icon is positioned to suggest the posture: standing figure near
+  the top, seated figure in the middle, kneeling figure near the bottom.  Each icon
+  is drawn in a distinct color matching the posture (gold, green, or brown).
 - **Settings button** — a small gear icon (⚙) in the lower-right corner of the
-  screen, reachable by touch.
+  screen, reachable by touch.  The posture icon never overlaps this button.
 
 > ![Main display screen](screenshots/main_display.png)
 > *Normal display: page 142, no posture cue.*
@@ -31,16 +33,17 @@ are configured during initial setup (see [Teach Mode](#teach-mode)).
 |----------|----------------------|-------------|
 | Next page | RIGHT arrow | Increment page number by 1 |
 | Previous page | LEFT arrow | Decrement page number by 1 |
-| Stand | UP arrow | Show "PLEASE STAND" |
-| Sit | DOWN arrow | Show "PLEASE BE SEATED" |
-| Kneel | (configured) | Show "PLEASE KNEEL" |
+| Stand | UP arrow | Show standing posture icon |
+| Sit | DOWN arrow | Show seated posture icon |
+| Kneel | (configured) | Show kneeling posture icon |
+| Blank screen | (configured) | Toggle blank screen (hides page and icon; ⚙ remains) |
 | Digit 0–9 | Number keys | Enter a page number directly |
 | Accept | ENTER / OK | Confirm a dialed page number |
 | Cancel | LAST / STOP / BACK | Cancel a dialed page number |
 | Backspace | (configured) | Delete the last digit entered |
 | Settings | (configured) | Open the settings dialog |
 
-> **Tip:** Press the same posture button again to clear the posture cue and return
+> **Tip:** Press the same posture button again to clear the posture icon and return
 > to the plain page display.
 
 ---
@@ -69,21 +72,38 @@ delay (configurable in Settings).
 
 ## Posture Cues
 
-Press the appropriate button to display a posture cue above the page number:
+Press the appropriate button to display a posture icon on the right side of the
+screen:
 
-| Button | Text shown | Color |
-|--------|-----------|-------|
-| Stand | PLEASE STAND | Gold / amber |
-| Sit | PLEASE BE SEATED | Green |
-| Kneel | PLEASE KNEEL | Brown |
+| Button | Icon | Color | Vertical position |
+|--------|------|-------|-------------------|
+| Stand | Standing stick figure | Gold / amber | Upper right |
+| Sit | Seated stick figure | Green | Middle right |
+| Kneel | Kneeling stick figure | Brown | Lower right |
 
-Press the same button a second time to clear the cue.
+The icons are white-on-transparent stick figures stored as `stand.png`,
+`sit.png`, and `kneel.png` in the project directory.  They are created
+automatically on the first run of the application.  The displayed color is taken
+from the posture color settings and can be changed in the Settings dialog.
 
-If the Settings > Posture duration is set to a non-zero value the cue will
+Press the same button a second time to clear the icon.
+
+If Settings > Posture duration is set to a non-zero value the icon will
 automatically clear after that many seconds.
 
 > ![Stand posture](screenshots/posture_stand.png)
-> *Display showing "PLEASE STAND" above page 142.*
+> *Display showing standing icon, upper right, page 142.*
+
+---
+
+## Blank Screen
+
+Press the button assigned to **Blank Screen** to hide the page number and posture
+icon while keeping the background color and the ⚙ settings button visible.
+Press the same button again to restore the display.
+
+This is useful between services or when the operator needs to suppress the display
+without losing the current page number.
 
 ---
 
@@ -109,6 +129,21 @@ holding Next/Previous page.  Default: 200 ms (5 changes per second).
 How long (in seconds) a posture cue stays on screen before auto-clearing.
 Set to **0** (the default) to keep the cue on screen until you press the
 button again.
+
+### Colors
+
+Five color swatches let you change the display color scheme:
+
+| Swatch | Controls |
+|--------|----------|
+| Background | Screen background color (default: dark blue `#1a3a5c`) |
+| Page numbers | Page number and default text color (default: warm cream `#f0e6c8`) |
+| Stand text | Color of the standing posture icon (default: gold `#c8a84e`) |
+| Sit text | Color of the seated posture icon (default: green `#6b8f6b`) |
+| Kneel text | Color of the kneeling posture icon (default: brown `#8b5e3c`) |
+
+Tap a swatch to open a color picker.  The swatch updates immediately to show
+the chosen color.  Changes take effect when you tap **Save**.
 
 ### Teach Buttons
 

@@ -47,17 +47,16 @@ Keep a separate log summarizing each update session.
 
 - [x] Add a new command to show a blank page (keep the settings
 button in the lower corner).
+- [x] Make various color choices configurable, keep the defaults.
 
 ## Icons for stand, site, kneel
 
-- [ ] TODO: Replace stand, kneel, ... text with posture icons
-  - [ ] PNG files in docs subdirectory
-  - [ ] kneel: appears below middle of screen on right side
-  - [ ] sit: appears at middle of screen on right side
-  - [ ] stand: appears above middle of screen on right side
-  - [ ] Rearrange display so image appears to right of numbers.
-  - [ ] Does not block settings icon
-  - [ ] Visible per 10 foot interface.
-  - [ ] Increase (maximize) size of displayed page numbers to fit space, with border.
-- [x] Make various color choices configurable, keep the defaults.
-
+- [x] Replace stand, kneel, ... text with posture icons
+  - [x] PNG files in docs subdirectory
+  - [x] kneel: appears below middle of screen on right side
+  - [x] sit: appears at middle of screen on right side
+  - [x] stand: appears above middle of screen on right side
+  - [x] Rearrange display so image appears to right of numbers.
+  - [x] Does not block settings icon
+  - [x] Visible per 10 foot interface.
+  - [x] Increase (maximize) size of displayed page numbers to fit space, with border.

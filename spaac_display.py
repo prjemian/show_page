@@ -27,6 +27,7 @@ from PyQt5 import QtWidgets
 CONFIG_DIR = Path.home() / ".spaac"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 KEYMAP_FILE = CONFIG_DIR / "keymap.json"
+ICON_DIR = Path(__file__).parent
 
 DEFAULT_CONFIG = {
     "repeat_delay_ms": 500,  # ms before key repeat begins
@@ -127,6 +128,93 @@ def save_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
+
+
+def _colorize_pixmap(pixmap, color):
+    """Return *pixmap* recolored to *color* (source must be white on transparent)."""
+    colored = QtGui.QPixmap(pixmap.size())
+    colored.fill(color)
+    painter = QtGui.QPainter(colored)
+    painter.setCompositionMode(QtGui.QPainter.CompositionMode_DestinationIn)
+    painter.drawPixmap(0, 0, pixmap)
+    painter.end()
+    return colored
+
+
+def _generate_posture_icons():
+    """Create white-on-transparent stick-figure PNG icons in ICON_DIR if absent.
+
+    Must be called after QApplication is initialized (QPixmap requires it).
+    """
+    ICON_DIR.mkdir(parents=True, exist_ok=True)
+    W, H = 200, 380
+    PEN_W = 14
+    HEAD_R = 28
+    cx = W // 2  # horizontal centre = 100
+
+    def _make_pixmap():
+        pix = QtGui.QPixmap(W, H)
+        pix.fill(QtCore.Qt.transparent)
+        return pix
+
+    def _make_painter(pix):
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        pen = QtGui.QPen(QtGui.QColor("white"))
+        pen.setWidth(PEN_W)
+        pen.setCapStyle(QtCore.Qt.RoundCap)
+        pen.setJoinStyle(QtCore.Qt.RoundJoin)
+        p.setPen(pen)
+        p.setBrush(QtGui.QColor("white"))
+        return p
+
+    # --- Stand ---
+    path = ICON_DIR / "stand.png"
+    if not path.exists():
+        pix = _make_pixmap()
+        p = _make_painter(pix)
+        p.drawEllipse(cx - HEAD_R, 7, HEAD_R * 2, HEAD_R * 2)  # head
+        p.drawLine(cx, 7 + HEAD_R * 2, cx, 210)                # torso
+        p.drawLine(cx, 115, 38, 180)                            # left arm
+        p.drawLine(cx, 115, 162, 180)                           # right arm
+        p.drawLine(cx, 210, 68, 368)                            # left leg
+        p.drawLine(cx, 210, 132, 368)                           # right leg
+        p.end()
+        pix.save(str(path), "PNG")
+
+    # --- Sit ---
+    path = ICON_DIR / "sit.png"
+    if not path.exists():
+        pix = _make_pixmap()
+        p = _make_painter(pix)
+        p.drawEllipse(cx - HEAD_R, 7, HEAD_R * 2, HEAD_R * 2)  # head
+        p.drawLine(cx, 7 + HEAD_R * 2, cx, 185)                # torso
+        p.drawLine(cx, 115, 38, 175)                            # left arm
+        p.drawLine(cx, 115, 162, 175)                           # right arm
+        p.drawLine(cx, 185, 28, 185)                            # left thigh (horizontal)
+        p.drawLine(cx, 185, 172, 185)                           # right thigh (horizontal)
+        p.drawLine(28, 185, 28, 315)                            # left lower leg
+        p.drawLine(172, 185, 172, 315)                          # right lower leg
+        p.end()
+        pix.save(str(path), "PNG")
+
+    # --- Kneel ---
+    path = ICON_DIR / "kneel.png"
+    if not path.exists():
+        pix = _make_pixmap()
+        p = _make_painter(pix)
+        p.drawEllipse(cx - HEAD_R, 27, HEAD_R * 2, HEAD_R * 2)  # head (lower = shorter figure)
+        p.drawLine(cx, 27 + HEAD_R * 2, cx, 225)                # torso
+        p.drawLine(cx, 145, 38, 225)                             # left arm
+        p.drawLine(cx, 145, 162, 225)                            # right arm
+        p.drawLine(cx, 225, 48, 308)                             # left upper leg (to knee)
+        p.drawLine(cx, 225, 152, 308)                            # right upper leg (to knee)
+        p.drawLine(48, 308, 18, 308)                             # left shin (horizontal, on floor)
+        p.drawLine(152, 308, 182, 308)                           # right shin (horizontal, on floor)
+        p.drawLine(18, 308, 18, 360)                             # left foot
+        p.drawLine(182, 308, 182, 360)                           # right foot
+        p.end()
+        pix.save(str(path), "PNG")
 
 
 # ---------------------------------------------------------------------------
@@ -972,8 +1060,8 @@ class SettingsDialog(QtWidgets.QDialog):
 class MainDisplay(QtWidgets.QMainWindow):
     """
     Full-screen display showing:
-      - Current page number (large, centered)
-      - Posture cue (stand / sit / kneel) with optional auto-clear
+      - Current page number (large, left panel) with border
+      - Posture icon (right panel, vertically positioned per posture)
       - Page-entry overlay when dialing digits
     """
 
@@ -1012,6 +1100,9 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.ir_reader.scancode_received.connect(self._on_scancode)
         self.ir_reader.debounce_ms = 50
 
+        # Load posture icons
+        self._load_posture_icons()
+
         # Build UI
         self._build_ui()
 
@@ -1039,40 +1130,63 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.setCentralWidget(central)
         central.setStyleSheet(f"background-color: {book_color};")
 
-        layout = QtWidgets.QVBoxLayout(central)
-        layout.setContentsMargins(20, 10, 20, 10)
+        outer = QtWidgets.QVBoxLayout(central)
+        outer.setContentsMargins(10, 10, 10, 10)
+        outer.setSpacing(4)
 
-        # --- Posture label (top) ---
-        self.posture_label = QtWidgets.QLabel("")
-        self.posture_label.setFont(QtGui.QFont("sans-serif", int(48 * self.scale_factor), QtGui.QFont.Bold))
-        self.posture_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.posture_label.setStyleSheet(f"color: {text_color};")
-        self.posture_label.setMinimumHeight(int(60 * self.scale_factor))
-        layout.addWidget(self.posture_label, stretch=1)
+        # --- Main content row: page number (left) + posture icon (right) ---
+        content = QtWidgets.QHBoxLayout()
+        content.setSpacing(8)
 
-        # --- Page number and dial overlay (stacked, center, dominant) ---
+        # Left panel: large page number
+        border_px = int(6 * self.scale_factor)
+        radius_px = int(16 * self.scale_factor)
+        pad_px = int(10 * self.scale_factor)
+
         stacked = QtWidgets.QStackedWidget()
 
         self.page_label = QtWidgets.QLabel("1")
-        self.page_label.setFont(QtGui.QFont("sans-serif", int(180 * self.scale_factor), QtGui.QFont.Bold))
+        self.page_label.setFont(QtGui.QFont("Monospace", int(200 * self.scale_factor), QtGui.QFont.Bold))
         self.page_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.page_label.setStyleSheet(f"color: {text_color};")
+        self.page_label.setStyleSheet(
+            f"color: {text_color};"
+            f" border: {border_px}px solid rgba(255,255,255,0.25);"
+            f" border-radius: {radius_px}px;"
+            f" padding: {pad_px}px;"
+        )
         stacked.addWidget(self.page_label)
 
         self.dial_label = QtWidgets.QLabel("")
-        self.dial_label.setFont(QtGui.QFont("sans-serif", int(180 * self.scale_factor), QtGui.QFont.Bold))
+        self.dial_label.setFont(QtGui.QFont("Monospace", int(200 * self.scale_factor), QtGui.QFont.Bold))
         self.dial_label.setAlignment(QtCore.Qt.AlignCenter)
         self.dial_label.setStyleSheet(
             f"color: #ffffff; background-color: rgba(0,0,0,0.8);"
             f" border-radius: {int(12 * self.scale_factor)}px; padding: {int(10 * self.scale_factor)}px;"
         )
         stacked.addWidget(self.dial_label)
-        stacked.setCurrentIndex(0)  # Start with page_label visible
+        stacked.setCurrentIndex(0)
         self.stacked = stacked
 
-        layout.addWidget(stacked, stretch=6)
+        content.addWidget(stacked, stretch=3)
 
-        # --- Settings button (small, bottom-right, touch accessible) ---
+        # Right panel: posture icon, vertically positioned (stand=top, sit=mid, kneel=bottom)
+        right_panel = QtWidgets.QWidget()
+        self.right_layout = QtWidgets.QVBoxLayout(right_panel)
+        self.right_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_layout.setSpacing(0)
+
+        self.icon_label = QtWidgets.QLabel()
+        self.icon_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.icon_label.hide()
+
+        self.right_layout.addStretch(1)        # index 0: top spacer
+        self.right_layout.addWidget(self.icon_label)  # index 1
+        self.right_layout.addStretch(1)        # index 2: bottom spacer
+
+        content.addWidget(right_panel, stretch=1)
+        outer.addLayout(content, stretch=1)
+
+        # --- Bottom bar: settings button (bottom-right, never blocked by icon) ---
         bottom_layout = QtWidgets.QHBoxLayout()
         bottom_layout.addStretch()
         self.settings_btn = QtWidgets.QPushButton("⚙")
@@ -1085,40 +1199,82 @@ class MainDisplay(QtWidgets.QMainWindow):
         )
         self.settings_btn.clicked.connect(self._open_settings)
         bottom_layout.addWidget(self.settings_btn)
-        layout.addLayout(bottom_layout)
+        outer.addLayout(bottom_layout)
 
         self.showFullScreen()
 
+    def _load_posture_icons(self):
+        """Load stick-figure pixmaps from ICON_DIR into self._posture_pixmaps."""
+        self._posture_pixmaps = {}
+        for posture, name in [
+            (POSTURE_STAND, "stand"),
+            (POSTURE_SIT, "sit"),
+            (POSTURE_KNEEL, "kneel"),
+        ]:
+            path = ICON_DIR / f"{name}.png"
+            pix = QtGui.QPixmap(str(path))
+            self._posture_pixmaps[posture] = pix if not pix.isNull() else None
+
     def _update_display(self):
-        """Refresh the page number, background color, and posture label from current state."""
+        """Refresh the page number, background color, and posture icon from current state."""
         book_color = self.config.get("book_color", "#1a3a5c")
         text_color = self.config.get("text_color", "#f0e6c8")
 
         self.centralWidget().setStyleSheet(f"background-color: {book_color};")
 
+        border_px = int(6 * self.scale_factor)
+        radius_px = int(16 * self.scale_factor)
+        pad_px = int(10 * self.scale_factor)
+
         if self.is_blank:
             self.page_label.setText("")
-            self.page_label.setStyleSheet(f"color: {book_color};")
-            self.posture_label.setText("")
-            self.posture_label.setStyleSheet(f"color: {book_color};")
+            self.page_label.setStyleSheet(
+                f"color: {book_color};"
+                f" border: {border_px}px solid {book_color};"
+                f" border-radius: {radius_px}px; padding: {pad_px}px;"
+            )
+            self.icon_label.hide()
             return
 
         self.page_label.setText(str(self.current_page))
-        self.page_label.setStyleSheet(f"color: {text_color};")
+        self.page_label.setStyleSheet(
+            f"color: {text_color};"
+            f" border: {border_px}px solid rgba(255,255,255,0.25);"
+            f" border-radius: {radius_px}px; padding: {pad_px}px;"
+        )
 
-        posture_text = POSTURE_SYMBOLS.get(self.posture, "")
-        self.posture_label.setText(posture_text)
+        # Posture icon — position and colorize, or hide when no posture set
+        if self.posture in (POSTURE_STAND, POSTURE_SIT, POSTURE_KNEEL):
+            raw = self._posture_pixmaps.get(self.posture)
+            if raw:
+                if self.posture == POSTURE_STAND:
+                    pc = QtGui.QColor(self.config.get("posture_stand_color", "#c8a84e"))
+                    self.right_layout.setStretch(0, 0)   # icon at top
+                    self.right_layout.setStretch(2, 10)
+                elif self.posture == POSTURE_SIT:
+                    pc = QtGui.QColor(self.config.get("posture_sit_color", "#6b8f6b"))
+                    self.right_layout.setStretch(0, 5)   # icon at middle
+                    self.right_layout.setStretch(2, 5)
+                else:  # KNEEL
+                    pc = QtGui.QColor(self.config.get("posture_kneel_color", "#8b5e3c"))
+                    self.right_layout.setStretch(0, 10)  # icon at bottom
+                    self.right_layout.setStretch(2, 0)
 
-        if self.posture == POSTURE_STAND:
-            pc = self.config.get("posture_stand_color", "#c8a84e")
-        elif self.posture == POSTURE_SIT:
-            pc = self.config.get("posture_sit_color", "#6b8f6b")
-        elif self.posture == POSTURE_KNEEL:
-            pc = self.config.get("posture_kneel_color", "#8b5e3c")
+                icon_w = int(120 * self.scale_factor)
+                icon_h = int(240 * self.scale_factor)
+                scaled = raw.scaled(
+                    QtCore.QSize(icon_w, icon_h),
+                    QtCore.Qt.KeepAspectRatio,
+                    QtCore.Qt.SmoothTransformation,
+                )
+                self.icon_label.setPixmap(_colorize_pixmap(scaled, pc))
+                self.icon_label.show()
+            else:
+                self.icon_label.hide()
         else:
-            pc = text_color
-
-        self.posture_label.setStyleSheet(f"color: {pc}; font-weight: bold;")
+            self.icon_label.hide()
+            self.right_layout.setStretch(0, 1)
+            self.right_layout.setStretch(2, 1)
 
     def _lookup_function(self, scancode):
         """Return the function name mapped to scancode, or None if unmapped."""
@@ -1309,6 +1465,9 @@ def main():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
     app = QtWidgets.QApplication(sys.argv)
+
+    # Generate posture icon PNGs on first run (requires QApplication)
+    _generate_posture_icons()
 
     # Hide cursor for kiosk mode
     app.setOverrideCursor(QtCore.Qt.BlankCursor)

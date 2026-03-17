@@ -32,5 +32,8 @@ and a standard TV remote.
 |------|-------------|
 | `spaac_display.py` | Main Python application (PyQt5 + evdev) |
 | `spaac.service` | systemd service unit — copy to `/etc/systemd/system/` |
+| `stand.png` | Stick-figure icon for "Please Stand" posture cue (auto-generated on first run) |
+| `sit.png` | Stick-figure icon for "Please Be Seated" posture cue (auto-generated on first run) |
+| `kneel.png` | Stick-figure icon for "Please Kneel" posture cue (auto-generated on first run) |
 | `Ararat-and-Khor-Virap.png` | Desktop wallpaper image |
 
