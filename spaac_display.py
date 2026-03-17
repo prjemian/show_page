@@ -49,6 +49,7 @@ FUNCTION_NAMES_CONTROLS = [
     "stand",  # UP    - congregation stand
     "sit",  # DOWN  - congregation sit
     "kneel",  # kneel
+    "blank",  # toggle blank screen
     "enter",  # accept dialed page
     "cancel",  # cancel dialed page (LAST or STOP)
     "backspace",  # delete last digit entered
@@ -77,6 +78,7 @@ FUNCTION_LABELS = {
     "stand": "Stand (↑)",
     "sit": "Sit (↓)",
     "kneel": "Kneel",
+    "blank": "Blank Screen",
     "digit_0": "0",
     "digit_1": "1",
     "digit_2": "2",
@@ -828,6 +830,45 @@ class SettingsDialog(QtWidgets.QDialog):
 
         layout.addSpacerItem(QtWidgets.QSpacerItem(20, 6))
 
+        # --- Colors ---
+        color_label = QtWidgets.QLabel("Colors:")
+        color_label.setFont(QtGui.QFont("sans-serif", int(11 * self.scale_factor)))
+        layout.addWidget(color_label)
+
+        color_grid = QtWidgets.QGridLayout()
+        color_grid.setSpacing(4)
+
+        self._color_values = {
+            "book_color": self.config.get("book_color", DEFAULT_CONFIG["book_color"]),
+            "text_color": self.config.get("text_color", DEFAULT_CONFIG["text_color"]),
+            "posture_stand_color": self.config.get("posture_stand_color", DEFAULT_CONFIG["posture_stand_color"]),
+            "posture_sit_color": self.config.get("posture_sit_color", DEFAULT_CONFIG["posture_sit_color"]),
+            "posture_kneel_color": self.config.get("posture_kneel_color", DEFAULT_CONFIG["posture_kneel_color"]),
+        }
+        color_labels = {
+            "book_color": "Background",
+            "text_color": "Page numbers",
+            "posture_stand_color": "Stand text",
+            "posture_sit_color": "Sit text",
+            "posture_kneel_color": "Kneel text",
+        }
+        self._color_btns = {}
+        for row, (key, display_name) in enumerate(color_labels.items()):
+            lbl = QtWidgets.QLabel(f"{display_name}:")
+            lbl.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor)))
+            color_grid.addWidget(lbl, row, 0)
+
+            btn = QtWidgets.QPushButton()
+            btn.setFixedSize(int(80 * self.scale_factor), int(28 * self.scale_factor))
+            self._apply_color_btn_style(btn, self._color_values[key])
+            btn.clicked.connect(lambda checked, k=key: self._pick_color(k))
+            color_grid.addWidget(btn, row, 1)
+            self._color_btns[key] = btn
+
+        layout.addLayout(color_grid)
+
+        layout.addSpacerItem(QtWidgets.QSpacerItem(20, 6))
+
         # --- Action buttons row ---
         action_layout = QtWidgets.QHBoxLayout()
 
@@ -863,6 +904,21 @@ class SettingsDialog(QtWidgets.QDialog):
 
         layout.addLayout(btn_layout)
 
+    def _apply_color_btn_style(self, btn, color):
+        """Style a color-picker button with a colored background swatch."""
+        btn.setStyleSheet(
+            f"QPushButton {{ background-color: {color}; border: 2px solid #888; border-radius: 4px; }}"
+            f" QPushButton:pressed {{ border: 2px solid #fff; }}"
+        )
+
+    def _pick_color(self, key):
+        """Open a color dialog and update the stored color for key."""
+        initial = QtGui.QColor(self._color_values[key])
+        color = QtWidgets.QColorDialog.getColor(initial, self, "Choose Color")
+        if color.isValid():
+            self._color_values[key] = color.name()
+            self._apply_color_btn_style(self._color_btns[key], color.name())
+
     def _update_posture_label(self, value):
         """Update the posture duration label to show 'Always on' or the value in seconds."""
         if value == 0:
@@ -892,10 +948,11 @@ class SettingsDialog(QtWidgets.QDialog):
         self.ir_reader.debounce_ms = old_debounce
 
     def _save(self):
-        """Collect slider values into config and accept the dialog."""
+        """Collect slider values and color choices into config and accept the dialog."""
         self.config["repeat_delay_ms"] = self.delay_slider.value()
         self.config["repeat_rate_ms"] = self.rate_slider.value()
         self.config["posture_duration_sec"] = self.posture_slider.value()
+        self.config.update(self._color_values)
         self.accept()
 
     def get_config(self):
@@ -942,6 +999,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.posture = POSTURE_NONE
         self.dialing_digits = ""
         self.is_dialing = False
+        self.is_blank = False
         self._settings_open = False
 
         # Repeat controller
@@ -1038,6 +1096,13 @@ class MainDisplay(QtWidgets.QMainWindow):
 
         self.centralWidget().setStyleSheet(f"background-color: {book_color};")
 
+        if self.is_blank:
+            self.page_label.setText("")
+            self.page_label.setStyleSheet(f"color: {book_color};")
+            self.posture_label.setText("")
+            self.posture_label.setStyleSheet(f"color: {book_color};")
+            return
+
         self.page_label.setText(str(self.current_page))
         self.page_label.setStyleSheet(f"color: {text_color};")
 
@@ -1086,6 +1151,8 @@ class MainDisplay(QtWidgets.QMainWindow):
             self._set_posture(POSTURE_SIT)
         elif fn == "kneel":
             self._set_posture(POSTURE_KNEEL)
+        elif fn == "blank":
+            self._toggle_blank()
         elif fn.startswith("digit_"):
             digit = fn[-1]
             self._dial_digit(digit)
@@ -1129,6 +1196,11 @@ class MainDisplay(QtWidgets.QMainWindow):
     def _clear_posture(self):
         """Clear the posture cue (called by the auto-clear timer)."""
         self.posture = POSTURE_NONE
+        self._update_display()
+
+    def _toggle_blank(self):
+        """Toggle blank screen mode — hides page and posture, keeps settings button."""
+        self.is_blank = not self.is_blank
         self._update_display()
 
     def _dial_digit(self, digit):

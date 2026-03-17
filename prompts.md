@@ -34,5 +34,29 @@ accept new page number      | ENTER button
 cancel page number change   | LAST button or STOP button
 setup and training          | SETUP button
 
-Empirical observation: Using `evdev` in a demo app, only `EV_MSC` and `EV_SYN`
-(no `EV_KEY`) events were received.
+Empirical observation: Using `evdev` in a demo app, only `EV_MSC` and 
+`EV_SYN` (no `EV_KEY`) events were received.
+
+## Update prompts
+
+Checklist items below marked FIXME or TODO should be addressed.  When
+complete, check the items off the list.  (Do not delete them).
+Keep a separate log summarizing each update session.
+
+## Blank page feature
+
+- [x] TODO: Add a new command to show a blank page (keep the settings
+button in the lower corner).
+
+## Icons for stand, site, kneel
+
+- [ ] TODO: Replace stand, kneel, ... text with language-independent, high-contrast image.
+  - [ ] stick figure, high-contrast, use as icon
+    - [ ] Person kneeling, appears below middle of screen on right side
+    - [ ] Person sitting, appears at middle of screen on right side
+    - [ ] Person standing, appears above middle of screen on right side
+- [ ] Rearrange display so image appears to right of numbers.
+- [ ] Visible per 10 foot interface.
+- [ ] Increase (maximize) size of displayed page numbers to fit space, with border.
+- [x] Make various color choices configurable, keep the defaults.
+
