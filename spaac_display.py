@@ -131,7 +131,18 @@ def save_json(path, data):
 
 
 def _colorize_pixmap(pixmap, color):
-    """Return *pixmap* recolored to *color* (source must be white on transparent)."""
+    """Return *pixmap* recolored to *color* (source must be white on transparent).
+
+    If the source pixmap has no alpha channel the compositing would produce a
+    solid-color rectangle, so we convert it to one that has alpha first.
+    """
+    # Ensure the source has an alpha channel for the compositing to work.
+    if not pixmap.hasAlphaChannel():
+        pixmap = pixmap.toImage().convertToFormat(
+            QtGui.QImage.Format_ARGB32_Premultiplied
+        )
+        pixmap = QtGui.QPixmap.fromImage(pixmap)
+
     colored = QtGui.QPixmap(pixmap.size())
     colored.fill(color)
     painter = QtGui.QPainter(colored)
