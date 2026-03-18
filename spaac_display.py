@@ -1239,6 +1239,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         """Increment or decrement the current page by delta, clamped to configured bounds."""
         if self.is_dialing:
             self._cancel_dial()
+        self.is_blank = False
         min_p = self.config.get("min_page", 1)
         max_p = self.config.get("max_page", 999)
         self.current_page = max(min_p, min(max_p, self.current_page + delta))
@@ -1275,6 +1276,7 @@ class MainDisplay(QtWidgets.QMainWindow):
 
     def _dial_digit(self, digit):
         """Append digit to the dialing buffer and show the dial overlay."""
+        self.is_blank = False
         if not self.is_dialing:
             self.is_dialing = True
             self.dialing_digits = ""
@@ -1289,6 +1291,7 @@ class MainDisplay(QtWidgets.QMainWindow):
 
     def _accept_dial(self):
         """Commit the dialed digits as the new current page and hide the dial overlay."""
+        self.is_blank = False
         if not self.is_dialing or not self.dialing_digits:
             self._cancel_dial()
             return
