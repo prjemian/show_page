@@ -137,8 +137,8 @@ in the app.
 
 **Possible causes:**
 
-1. **Buttons not taught** — Open Settings → Teach Buttons and map remote buttons
-   to functions.  See [User Guide — Teach Mode](user_guide.md#teach-mode).
+1. **Buttons not taught** — Open Settings, switch to the **Teach** tab and map
+   remote buttons to functions.  See [User Guide — Teach tab](user_guide.md#teach-tab).
 
 2. **Wrong device** — The app looks for a device named exactly `gpio_ir_recv`.
    Verify:
@@ -246,7 +246,7 @@ cat ~/.spaac/keymap.json
 If the files are missing, run the app once manually and open Settings > Save to
 create them.
 
-### The gear (⚙) button is hard to tap
+### The gear button is hard to tap
 
 The settings button is intentionally small to avoid accidental taps during
 normal use.  If accessibility is a concern you can tap the exact lower-right

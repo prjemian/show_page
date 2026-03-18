@@ -1069,7 +1069,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         stacked = QtWidgets.QStackedWidget()
 
         self.page_label = QtWidgets.QLabel("1")
-        self.page_label.setFont(QtGui.QFont("Monospace", int(200 * self.scale_factor), QtGui.QFont.Bold))
+        self.page_label.setFont(QtGui.QFont("Monospace", int(260 * self.scale_factor), QtGui.QFont.Bold))
         self.page_label.setAlignment(QtCore.Qt.AlignCenter)
         self.page_label.setStyleSheet(
             f"color: {text_color}; padding: {pad_px}px;"
@@ -1077,7 +1077,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         stacked.addWidget(self.page_label)
 
         self.dial_label = QtWidgets.QLabel("")
-        self.dial_label.setFont(QtGui.QFont("Monospace", int(200 * self.scale_factor), QtGui.QFont.Bold))
+        self.dial_label.setFont(QtGui.QFont("Monospace", int(260 * self.scale_factor), QtGui.QFont.Bold))
         self.dial_label.setAlignment(QtCore.Qt.AlignCenter)
         self.dial_label.setStyleSheet(
             f"color: #ffffff; background-color: rgba(0,0,0,0.8);"

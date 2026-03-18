@@ -10,17 +10,18 @@ display is controlled by a TV remote held by an altar server.
 
 In normal operation the screen shows:
 
-- **Page number** — large digits on the left portion of the screen, with a subtle
-  border, readable from the back of the church.
+- **Page number** — large digits on the left portion of the screen, readable from
+  the back of the church.
 - **Posture icon** — when active, a stick-figure icon appears on the right side of
   the screen.  The icon is positioned to suggest the posture: standing figure near
   the top, seated figure in the middle, kneeling figure near the bottom.  Each icon
   is drawn in a distinct color matching the posture (gold, green, or brown).
-- **Settings button** — a small gear icon (⚙) in the lower-right corner of the
+- **Settings button** — a small gear icon in the lower-right corner of the
   screen, reachable by touch.  The posture icon never overlaps this button.
 
+<!-- TODO: replace with updated screenshot -->
 > ![Main display screen](screenshots/main_display.png)
-> *Normal display: page 142, no posture cue.*
+> *Normal display: page number, no posture cue.*
 
 ---
 
@@ -36,7 +37,7 @@ are configured during initial setup (see [Teach Mode](#teach-mode)).
 | Stand | UP arrow | Show standing posture icon |
 | Sit | DOWN arrow | Show seated posture icon |
 | Kneel | (configured) | Show kneeling posture icon |
-| Blank screen | (configured) | Toggle blank screen (hides page and icon; ⚙ remains) |
+| Blank screen | (configured) | Toggle blank screen (hides page and icon; gear remains) |
 | Digit 0–9 | Number keys | Enter a page number directly |
 | Accept | ENTER / OK | Confirm a dialed page number |
 | Cancel | LAST / STOP / BACK | Cancel a dialed page number |
@@ -65,8 +66,9 @@ delay (configurable in Settings).
 4. If you do nothing for 8 seconds the dial entry is automatically cancelled.
 5. Press **BACKSPACE** to erase the last digit without cancelling.
 
+<!-- TODO: replace with updated screenshot -->
 > ![Dial mode](screenshots/dial_mode.png)
-> *Dialing "142" before pressing ENTER.*
+> *Dialing a page number before pressing ENTER.*
 
 ---
 
@@ -82,24 +84,25 @@ screen:
 | Kneel | Kneeling stick figure | Brown | Lower right |
 
 The icons are white-on-transparent stick figures stored as `stand.png`,
-`sit.png`, and `kneel.png` in the project directory.  They are created
-automatically on the first run of the application.  The displayed color is taken
-from the posture color settings and can be changed in the Settings dialog.
+`sit.png`, and `kneel.png` in the project directory.  If the files are missing
+they are auto-generated on launch.  The displayed color is taken from the posture
+color settings and can be changed on the **Colors** tab of the Settings dialog.
 
 Press the same button a second time to clear the icon.
 
-If Settings > Posture duration is set to a non-zero value the icon will
-automatically clear after that many seconds.
+If the posture duration (on the **Settings** tab) is set to a non-zero value the
+icon will automatically clear after that many seconds.
 
+<!-- TODO: replace with updated screenshot -->
 > ![Stand posture](screenshots/posture_stand.png)
-> *Display showing standing icon, upper right, page 142.*
+> *Display showing standing icon, upper right.*
 
 ---
 
 ## Blank Screen
 
 Press the button assigned to **Blank Screen** to hide the page number and posture
-icon while keeping the background color and the ⚙ settings button visible.
+icon while keeping the background color and the gear settings button visible.
 Press the same button again to restore the display.
 
 This is useful between services or when the operator needs to suppress the display
@@ -109,94 +112,85 @@ without losing the current page number.
 
 ## Settings
 
-Touch the **⚙** button in the lower-right corner (or press the remote button
-mapped to "Setup") to open the settings dialog.
+Touch the gear button in the lower-right corner (or press the remote button
+mapped to "Setup") to open the settings dialog.  The dialog is organized into
+four tabs: **Settings**, **Colors**, **Teach**, and **Test**.
 
+**Save** (at the bottom of the dialog) stores all changes across every tab and
+closes the dialog.  **Cancel** discards all changes.
+
+<!-- TODO: replace with updated screenshot showing tabbed dialog -->
 > ![Settings dialog](screenshots/settings_dialog.png)
 
-### Repeat Delay
+### Settings tab
+
+#### Repeat Delay
 
 How long (in milliseconds) you must hold the Next/Previous page button before
 it starts repeating.  Default: 500 ms.
 
-### Repeat Rate
+#### Repeat Rate
 
 How quickly (in milliseconds between repeats) the page number changes while
 holding Next/Previous page.  Default: 200 ms (5 changes per second).
 
-### Posture Display Duration
+#### Posture Display Duration
 
 How long (in seconds) a posture cue stays on screen before auto-clearing.
 Set to **0** (the default) to keep the cue on screen until you press the
 button again.
 
-### Colors
+### Colors tab
 
 Five color swatches let you change the display color scheme:
 
 | Swatch | Controls |
 |--------|----------|
 | Background | Screen background color (default: dark blue `#1a3a5c`) |
-| Page numbers | Page number and default text color (default: warm cream `#f0e6c8`) |
-| Stand text | Color of the standing posture icon (default: gold `#c8a84e`) |
-| Sit text | Color of the seated posture icon (default: green `#6b8f6b`) |
-| Kneel text | Color of the kneeling posture icon (default: brown `#8b5e3c`) |
+| Page Number | Page number text color (default: warm cream `#f0e6c8`) |
+| Stand Icon | Color of the standing posture icon (default: gold `#c8a84e`) |
+| Sit Icon | Color of the seated posture icon (default: green `#6b8f6b`) |
+| Kneel Icon | Color of the kneeling posture icon (default: brown `#8b5e3c`) |
 
 Tap a swatch to open a color picker.  The swatch updates immediately to show
 the chosen color.  Changes take effect when you tap **Save**.
 
-### Teach Buttons
+### Teach tab
 
-Opens [Teach Mode](#teach-mode) to assign remote buttons to functions.
+The Teach tab lets you assign any button on your remote to any application
+function.
 
-### Test Buttons
+<!-- TODO: replace with updated screenshot showing Teach tab -->
+> ![Teach tab](screenshots/teach_mode.png)
 
-Opens [Test Mode](#test-mode) to verify your button assignments.
-
-### Save / Cancel
-
-**Save** stores the settings and closes the dialog.  **Cancel** discards changes.
-
----
-
-## Teach Mode
-
-Teach mode lets you assign any button on your remote to any application function.
-
-> ![Teach mode dialog](screenshots/teach_mode.png)
-> Teach mode dialog with most buttons trained.
-
-1. Open Settings, then tap **Teach Buttons**.
-2. The dialog shows two columns: *Controls* on the left and *Digits* on the right.
+1. Switch to the **Teach** tab.
+2. The tab shows two columns: *Controls* on the left and *Digits* on the right.
    Each row shows the function name, the currently assigned scancode (if any),
    and **Learn** / **✕** buttons.
 3. Tap **Learn** next to the function you want to assign.  The button turns blue
-   and a status message says "Press remote button for: …".
+   and a status message says "Press remote button for: ...".
 4. Point the remote at the IR receiver and press the button once.
 5. The scancode is captured and shown in the row.  If the same button was already
    assigned to another function, that old assignment is automatically cleared.
 6. Repeat for each function.
 7. Tap **Save** when done, or **Cancel** to discard changes.
 
-> **Tip:** Use **Clear All** to erase all mappings and start fresh with a
-> different remote.
+> **Tip:** Use **Clear All Mappings** to erase all mappings and start fresh with
+> a different remote.
 
----
+### Test tab
 
-## Test Mode
+The Test tab lets you verify your button assignments without changing any pages.
 
-Test mode lets you verify your button assignments without changing any pages.
+<!-- TODO: replace with updated screenshot showing Test tab -->
+> ![Test tab](screenshots/test_mode.png)
 
-> ![Test mode dialog](screenshots/test_mode.png)
-> Test mode showing remote's *Enter/Accept* button pressed.
-
-1. Open Settings, then tap **Test Buttons**.
+1. Switch to the **Test** tab.
 2. Press any button on the remote.
-3. The dialog shows:
+3. The tab shows:
    - The raw scancode received.
    - The function it is mapped to (green) or **UNMAPPED** (red) if the button
      has not been assigned.
-4. Tap **Close** when finished.
 
 ---
 

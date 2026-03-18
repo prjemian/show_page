@@ -433,9 +433,9 @@ is available when the spaac service starts.
 
 After the app is running, teach it your remote's buttons:
 
-1. Touch the **⚙** button in the lower-right corner of the screen.
-2. Tap **Teach Buttons**.
-3. Follow the [Teach Mode instructions](user_guide.md#teach-mode) in the User Guide.
+1. Touch the gear button in the lower-right corner of the screen.
+2. Switch to the **Teach** tab.
+3. Follow the [Teach tab instructions](user_guide.md#teach-tab) in the User Guide.
 4. Tap **Save**.
 
 The key mapping is saved to `~/.spaac/keymap.json` and persists across reboots.

@@ -60,3 +60,22 @@ button in the lower corner).
   - [x] Does not block settings icon
   - [x] Visible per 10 foot interface.
   - [x] Increase (maximize) size of displayed page numbers to fit space, with border.
+
+## 2026-03-18 session
+
+- [x] Fix posture icons rendering as solid-color rectangles (PNG files
+  lacked alpha channel; `_colorize_pixmap` now handles missing alpha
+  defensively).
+- [x] Restore original hand-drawn posture icon PNGs from the `.odg`
+  source; convert from black-on-white RGB to white-on-transparent RGBA
+  so compositing works correctly.
+- [x] Remove colored border around displayed page numbers.
+- [x] Restructure Settings dialog as a tabbed panel (Settings, Colors,
+  Teach, Test) instead of cramming everything onto one page with
+  sub-dialogs.  `TeachDialog` and `TestButtonDialog` classes removed;
+  their content is now embedded as tabs.
+- [x] Increase page number font size (base 200pt -> 260pt) for better
+  readability on the 800x480 RPi 7" touchscreen.
+- [x] Update all documentation (README, User Guide, Installation Guide,
+  Troubleshooting) to reflect UI changes.  Screenshot placeholders
+  marked with `<!-- TODO: replace with updated screenshot -->`.
