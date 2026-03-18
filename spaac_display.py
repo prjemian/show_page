@@ -404,188 +404,254 @@ class RepeatController:
 
 
 # ---------------------------------------------------------------------------
-# Test Button Dialog
+# Settings Dialog  (tabbed: Settings | Colors | Teach | Test)
 # ---------------------------------------------------------------------------
 
 
-class TestButtonDialog(QtWidgets.QDialog):
-    """
-    Press any button on the remote and see which function it is
-    mapped to, or whether it is unmapped.
+class SettingsDialog(QtWidgets.QDialog):
+    """Tabbed settings dialog for the SPAAC page display.
+
+    Tabs:
+        Settings  – repeat timing, posture duration
+        Colors    – background, text, and posture-icon colour pickers
+        Teach     – map IR remote scancodes to logical functions
+        Test      – press a remote button and see its mapped function
     """
 
-    def __init__(self, ir_reader, keymap, parent=None):
+    def __init__(self, config, keymap, ir_reader, parent=None):
         """
-        Initialize TestButtonDialog.
+        Initialize SettingsDialog.
 
         Args:
-            ir_reader: IRReader instance providing scancode_received signal.
+            config: Configuration dict with timing and color values.
             keymap: Dict mapping scancode strings to function names.
+            ir_reader: IRReader instance for Teach / Test tabs.
             parent: Optional parent QWidget.
         """
         super().__init__(parent)
+        self.config = dict(config)
+        self.keymap = dict(keymap)
         self.ir_reader = ir_reader
-        self.keymap = keymap
 
-        # Compute scale factor based on screen height
-        screen = QtWidgets.QApplication.primaryScreen()
-        screen_size = screen.size()
-        self.screen_height = screen_size.height()
-        self.scale_factor = min((self.screen_height / 600.0) ** 0.7, 1.5)
-
-        self.setWindowTitle("SPAAC — Test Remote Buttons")
-        self.setModal(True)
-        self.setMinimumSize(int(500 * self.scale_factor), int(350 * self.scale_factor))
-
-        layout = QtWidgets.QVBoxLayout(self)
-
-        title = QtWidgets.QLabel("Test Remote Buttons")
-        title.setFont(QtGui.QFont("sans-serif", int(18 * self.scale_factor), QtGui.QFont.Bold))
-        title.setAlignment(QtCore.Qt.AlignCenter)
-        layout.addWidget(title)
-
-        instructions = QtWidgets.QLabel(
-            "Press any button on the remote to see\n"
-            #
-            "what function it is mapped to."
-        )
-        instructions.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
-        instructions.setAlignment(QtCore.Qt.AlignCenter)
-        instructions.setStyleSheet("color: #555;")
-        layout.addWidget(instructions)
-
-        layout.addSpacerItem(QtWidgets.QSpacerItem(20, 20))
-
-        self.scancode_label = QtWidgets.QLabel("Scancode: —")
-        self.scancode_label.setFont(QtGui.QFont("monospace", int(16 * self.scale_factor)))
-        self.scancode_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.scancode_label.setStyleSheet(
-            "background-color: #fff; border: 1px solid #ccc;"
-            " border-radius: 6px; padding: 10px;"
-        )
-        layout.addWidget(self.scancode_label)
-
-        self.function_label = QtWidgets.QLabel("Function: —")
-        self.function_label.setFont(QtGui.QFont("sans-serif", int(20 * self.scale_factor), QtGui.QFont.Bold))
-        self.function_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.function_label.setMinimumHeight(int(60 * self.scale_factor))
-        self.function_label.setStyleSheet(
-            "background-color: #f0f0f0; border: 1px solid #ccc;"
-            " border-radius: 6px; padding: 10px;"
-        )
-        layout.addWidget(self.function_label)
-
-        layout.addSpacerItem(QtWidgets.QSpacerItem(20, 30))
-
-        close_btn = QtWidgets.QPushButton("Close")
-        close_btn.setFont(QtGui.QFont("sans-serif", int(13 * self.scale_factor)))
-        close_btn.setMinimumHeight(int(44 * self.scale_factor))
-        close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
-
-        self.ir_reader.scancode_received.connect(self._on_scancode)
-
-    @QtCore.pyqtSlot(int)
-    def _on_scancode(self, scancode):
-        """Update the UI to show the received scancode and its mapped function name."""
-        sc_str = str(scancode)
-        self.scancode_label.setText(f"Scancode: {scancode}")
-
-        fn = self.keymap.get(sc_str, None)
-        if fn:
-            label = FUNCTION_LABELS.get(fn, fn)
-            self.function_label.setText(f"✓ {label}")
-            self.function_label.setStyleSheet(
-                "background-color: #d4edda; border: 1px solid #28a745;"
-                " border-radius: 6px; padding: 10px;"
-                " color: #155724; font-weight: bold;"
-            )
-        else:
-            self.function_label.setText("✗ UNMAPPED")
-            self.function_label.setStyleSheet(
-                "background-color: #f8d7da; border: 1px solid #dc3545;"
-                " border-radius: 6px; padding: 10px;"
-                " color: #721c24; font-weight: bold;"
-            )
-
-
-# ---------------------------------------------------------------------------
-# Teach Mode Dialog (Two-column form with scroll)
-# ---------------------------------------------------------------------------
-
-
-class TeachDialog(QtWidgets.QDialog):
-    """
-    Form-based dialog for mapping IR remote scancodes to logical functions.
-    Two-column layout: control functions on the left, digit functions on
-    the right.  Wrapped in a scroll area for small displays.
-    """
-
-    def __init__(self, ir_reader, current_keymap, parent=None):
-        """
-        Initialize TeachDialog.
-
-        Args:
-            ir_reader: IRReader instance providing scancode_received signal.
-            current_keymap: Dict mapping scancode strings to function names.
-            parent: Optional parent QWidget.
-        """
-        super().__init__(parent)
-        self.ir_reader = ir_reader
-        self.keymap = dict(current_keymap)
+        # Reverse map for teach tab
         self.reverse_map = {}
         for sc, fn in self.keymap.items():
             self.reverse_map[fn] = sc
 
+        # Teach-mode listening state
+        self._listening_function = None
+        self._listen_start_time = 0.0
+        self._listen_settle_ms = 600
+        self._listen_timeout_ms = 10000
+        self._listen_timer = QtCore.QTimer()
+        self._listen_timer.setSingleShot(True)
+        self._listen_timer.timeout.connect(self._stop_listening)
+        self._row_widgets = {}
+
         # Compute scale factor based on screen height
         screen = QtWidgets.QApplication.primaryScreen()
         screen_size = screen.size()
         self.screen_height = screen_size.height()
         self.scale_factor = min((self.screen_height / 600.0) ** 0.7, 1.5)
 
-        self.setWindowTitle("SPAAC — Teach Remote Buttons")
+        self.setWindowTitle("SPAAC — Settings")
         self.setModal(True)
         self.setMinimumSize(int(620 * self.scale_factor), int(420 * self.scale_factor))
 
-        self._listening_function = None
-        self._listen_start_time = 0.0
-        self._listen_settle_ms = 600
-        self._listen_timeout_ms = 10000
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(4, 4, 4, 4)
+        outer.setSpacing(4)
 
-        self._listen_timer = QtCore.QTimer()
-        self._listen_timer.setSingleShot(True)
-        self._listen_timer.timeout.connect(self._stop_listening)
+        # --- Tab widget ---
+        self.tabs = QtWidgets.QTabWidget()
+        self.tabs.setFont(QtGui.QFont("sans-serif", int(11 * self.scale_factor)))
+        outer.addWidget(self.tabs, stretch=1)
 
-        # --- Build UI ---
-        main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(6, 6, 6, 6)
-        main_layout.setSpacing(4)
+        self.tabs.addTab(self._build_settings_tab(), "Settings")
+        self.tabs.addTab(self._build_colors_tab(), "Colors")
+        self.tabs.addTab(self._build_teach_tab(), "Teach")
+        self.tabs.addTab(self._build_test_tab(), "Test")
 
-        title = QtWidgets.QLabel("Teach Remote Buttons")
-        title.setFont(QtGui.QFont("sans-serif", int(16 * self.scale_factor), QtGui.QFont.Bold))
-        title.setAlignment(QtCore.Qt.AlignCenter)
-        main_layout.addWidget(title)
+        # --- Save / Cancel ---
+        btn_layout = QtWidgets.QHBoxLayout()
+        btn_layout.setSpacing(8)
+
+        ok_btn = QtWidgets.QPushButton("Save")
+        ok_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
+        ok_btn.setMinimumHeight(int(40 * self.scale_factor))
+        ok_btn.clicked.connect(self._save)
+        btn_layout.addWidget(ok_btn)
+
+        cancel_btn = QtWidgets.QPushButton("Cancel")
+        cancel_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
+        cancel_btn.setMinimumHeight(int(40 * self.scale_factor))
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        outer.addLayout(btn_layout)
+
+        # Connect IR signal (used by both Teach and Test tabs)
+        self.ir_reader.scancode_received.connect(self._on_scancode)
+
+    # ---- tab builders -----------------------------------------------------
+
+    def _build_settings_tab(self):
+        """Build the Settings tab: repeat delay, repeat rate, posture duration."""
+        page = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(page)
+        layout.setSpacing(6)
+
+        sf = self.scale_factor
+
+        # --- Repeat delay ---
+        delay_label = QtWidgets.QLabel("Repeat Delay (ms before repeat starts):")
+        delay_label.setFont(QtGui.QFont("sans-serif", int(11 * sf)))
+        layout.addWidget(delay_label)
+
+        self.delay_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.delay_slider.setMinimum(100)
+        self.delay_slider.setMaximum(2000)
+        self.delay_slider.setValue(self.config.get("repeat_delay_ms", 500))
+        self.delay_slider.setTickInterval(100)
+        self.delay_slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        layout.addWidget(self.delay_slider)
+
+        self.delay_value_label = QtWidgets.QLabel(f"{self.delay_slider.value()} ms")
+        self.delay_value_label.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
+        self.delay_value_label.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(self.delay_value_label)
+        self.delay_slider.valueChanged.connect(
+            lambda v: self.delay_value_label.setText(f"{v} ms")
+        )
+
+        # --- Repeat rate ---
+        rate_label = QtWidgets.QLabel("Repeat Rate (ms between repeats):")
+        rate_label.setFont(QtGui.QFont("sans-serif", int(11 * sf)))
+        layout.addWidget(rate_label)
+
+        self.rate_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.rate_slider.setMinimum(50)
+        self.rate_slider.setMaximum(1000)
+        self.rate_slider.setValue(self.config.get("repeat_rate_ms", 200))
+        self.rate_slider.setTickInterval(50)
+        self.rate_slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        layout.addWidget(self.rate_slider)
+
+        self.rate_value_label = QtWidgets.QLabel(f"{self.rate_slider.value()} ms")
+        self.rate_value_label.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
+        self.rate_value_label.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(self.rate_value_label)
+        self.rate_slider.valueChanged.connect(
+            lambda v: self.rate_value_label.setText(f"{v} ms")
+        )
+
+        # --- Posture duration ---
+        posture_label = QtWidgets.QLabel("Posture Display Duration (seconds, 0 = stays on):")
+        posture_label.setFont(QtGui.QFont("sans-serif", int(11 * sf)))
+        layout.addWidget(posture_label)
+
+        self.posture_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.posture_slider.setMinimum(0)
+        self.posture_slider.setMaximum(120)
+        self.posture_slider.setValue(self.config.get("posture_duration_sec", 0))
+        self.posture_slider.setTickInterval(5)
+        self.posture_slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        layout.addWidget(self.posture_slider)
+
+        posture_val = self.posture_slider.value()
+        self.posture_value_label = QtWidgets.QLabel(
+            "Always on" if posture_val == 0 else f"{posture_val} sec"
+        )
+        self.posture_value_label.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
+        self.posture_value_label.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(self.posture_value_label)
+        self.posture_slider.valueChanged.connect(self._update_posture_label)
+
+        layout.addStretch()
+        return page
+
+    def _build_colors_tab(self):
+        """Build the Colors tab: background, text, and posture-icon colour pickers."""
+        page = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(page)
+        layout.setSpacing(8)
+
+        sf = self.scale_factor
+
+        self._color_values = {
+            "book_color": self.config.get("book_color", DEFAULT_CONFIG["book_color"]),
+            "text_color": self.config.get("text_color", DEFAULT_CONFIG["text_color"]),
+            "posture_stand_color": self.config.get(
+                "posture_stand_color", DEFAULT_CONFIG["posture_stand_color"]
+            ),
+            "posture_sit_color": self.config.get(
+                "posture_sit_color", DEFAULT_CONFIG["posture_sit_color"]
+            ),
+            "posture_kneel_color": self.config.get(
+                "posture_kneel_color", DEFAULT_CONFIG["posture_kneel_color"]
+            ),
+        }
+
+        color_labels = {
+            "book_color": "Background",
+            "text_color": "Page Number",
+            "posture_stand_color": "Stand Icon",
+            "posture_sit_color": "Sit Icon",
+            "posture_kneel_color": "Kneel Icon",
+        }
+
+        color_grid = QtWidgets.QGridLayout()
+        color_grid.setSpacing(int(10 * sf))
+        color_grid.setColumnStretch(0, 1)
+        color_grid.setColumnStretch(1, 0)
+
+        self._color_btns = {}
+        for row, (key, display_name) in enumerate(color_labels.items()):
+            lbl = QtWidgets.QLabel(f"{display_name}:")
+            lbl.setFont(QtGui.QFont("sans-serif", int(12 * sf)))
+            color_grid.addWidget(lbl, row, 0)
+
+            btn = QtWidgets.QPushButton()
+            btn.setFixedSize(int(100 * sf), int(36 * sf))
+            self._apply_color_btn_style(btn, self._color_values[key])
+            btn.clicked.connect(lambda checked, k=key: self._pick_color(k))
+            color_grid.addWidget(btn, row, 1)
+            self._color_btns[key] = btn
+
+        layout.addLayout(color_grid)
+        layout.addStretch()
+        return page
+
+    def _build_teach_tab(self):
+        """Build the Teach tab: two-column grid for mapping remote buttons."""
+        page = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(page)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
+
+        sf = self.scale_factor
 
         instructions = QtWidgets.QLabel(
-            'Click "Learn" next to a function, then press the ' "remote button once."
+            'Click "Learn" next to a function, then press the remote button once.'
         )
-        instructions.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor)))
+        instructions.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
         instructions.setAlignment(QtCore.Qt.AlignCenter)
+        instructions.setWordWrap(True)
         instructions.setStyleSheet("color: #555;")
-        main_layout.addWidget(instructions)
+        layout.addWidget(instructions)
 
         # Status bar
-        self.status_label = QtWidgets.QLabel("")
-        self.status_label.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor)))
-        self.status_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.status_label.setMinimumHeight(int(26 * self.scale_factor))
-        self.status_label.setStyleSheet(
+        self.teach_status_label = QtWidgets.QLabel("")
+        self.teach_status_label.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
+        self.teach_status_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.teach_status_label.setMinimumHeight(int(24 * sf))
+        self.teach_status_label.setStyleSheet(
             "color: #ffffff; background-color: #444;"
             " border-radius: 6px; padding: 3px;"
         )
-        main_layout.addWidget(self.status_label)
+        layout.addWidget(self.teach_status_label)
 
-        # --- Scroll area containing two-column layout ---
+        # Scroll area containing two-column layout
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
@@ -596,58 +662,82 @@ class TeachDialog(QtWidgets.QDialog):
         columns_layout.setContentsMargins(2, 2, 2, 2)
         columns_layout.setSpacing(8)
 
-        self._row_widgets = {}
-
         # Left column: control functions
         left_group = QtWidgets.QGroupBox("Controls")
-        left_group.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor), QtGui.QFont.Bold))
+        left_group.setFont(QtGui.QFont("sans-serif", int(10 * sf), QtGui.QFont.Bold))
         left_grid = QtWidgets.QGridLayout(left_group)
         left_grid.setSpacing(3)
-        self._populate_grid(left_grid, FUNCTION_NAMES_CONTROLS)
+        self._populate_teach_grid(left_grid, FUNCTION_NAMES_CONTROLS)
         columns_layout.addWidget(left_group, stretch=1)
 
         # Right column: digit functions
         right_group = QtWidgets.QGroupBox("Digits")
-        right_group.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor), QtGui.QFont.Bold))
+        right_group.setFont(QtGui.QFont("sans-serif", int(10 * sf), QtGui.QFont.Bold))
         right_grid = QtWidgets.QGridLayout(right_group)
         right_grid.setSpacing(3)
-        self._populate_grid(right_grid, FUNCTION_NAMES_DIGITS)
+        self._populate_teach_grid(right_grid, FUNCTION_NAMES_DIGITS)
         columns_layout.addWidget(right_group, stretch=1)
 
         scroll.setWidget(scroll_content)
-        main_layout.addWidget(scroll, stretch=1)
+        layout.addWidget(scroll, stretch=1)
 
-        # --- Bottom buttons ---
-        btn_layout = QtWidgets.QHBoxLayout()
-        btn_layout.setSpacing(8)
-
-        clear_all_btn = QtWidgets.QPushButton("Clear All")
-        clear_all_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
-        clear_all_btn.setMinimumHeight(int(38 * self.scale_factor))
+        # Clear All button
+        clear_all_btn = QtWidgets.QPushButton("Clear All Mappings")
+        clear_all_btn.setFont(QtGui.QFont("sans-serif", int(11 * sf)))
+        clear_all_btn.setMinimumHeight(int(34 * sf))
         clear_all_btn.clicked.connect(self._clear_all_mappings)
-        btn_layout.addWidget(clear_all_btn)
+        layout.addWidget(clear_all_btn)
 
-        btn_layout.addStretch()
+        return page
 
-        save_btn = QtWidgets.QPushButton("Save")
-        save_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
-        save_btn.setMinimumHeight(int(38 * self.scale_factor))
-        save_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(save_btn)
+    def _build_test_tab(self):
+        """Build the Test tab: press a remote button and see its mapped function."""
+        page = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(page)
+        layout.setSpacing(8)
 
-        cancel_btn = QtWidgets.QPushButton("Cancel")
-        cancel_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
-        cancel_btn.setMinimumHeight(int(38 * self.scale_factor))
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
+        sf = self.scale_factor
 
-        main_layout.addLayout(btn_layout)
+        instructions = QtWidgets.QLabel(
+            "Press any button on the remote to see\n"
+            "what function it is mapped to."
+        )
+        instructions.setFont(QtGui.QFont("sans-serif", int(12 * sf)))
+        instructions.setAlignment(QtCore.Qt.AlignCenter)
+        instructions.setStyleSheet("color: #555;")
+        layout.addWidget(instructions)
 
-        # Connect IR signal
-        self.ir_reader.scancode_received.connect(self._on_scancode)
+        layout.addStretch()
 
-    def _populate_grid(self, grid, function_list):
+        self.test_scancode_label = QtWidgets.QLabel("Scancode: —")
+        self.test_scancode_label.setFont(QtGui.QFont("monospace", int(16 * sf)))
+        self.test_scancode_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.test_scancode_label.setStyleSheet(
+            "background-color: #fff; border: 1px solid #ccc;"
+            " border-radius: 6px; padding: 10px;"
+        )
+        layout.addWidget(self.test_scancode_label)
+
+        self.test_function_label = QtWidgets.QLabel("Function: —")
+        self.test_function_label.setFont(
+            QtGui.QFont("sans-serif", int(20 * sf), QtGui.QFont.Bold)
+        )
+        self.test_function_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.test_function_label.setMinimumHeight(int(60 * sf))
+        self.test_function_label.setStyleSheet(
+            "background-color: #f0f0f0; border: 1px solid #ccc;"
+            " border-radius: 6px; padding: 10px;"
+        )
+        layout.addWidget(self.test_function_label)
+
+        layout.addStretch()
+        return page
+
+    # ---- teach helpers ----------------------------------------------------
+
+    def _populate_teach_grid(self, grid, function_list):
         """Populate a grid with function rows: label, scancode, learn, clear."""
+        sf = self.scale_factor
         grid.setColumnStretch(0, 3)
         grid.setColumnStretch(1, 2)
         grid.setColumnStretch(2, 1)
@@ -655,14 +745,14 @@ class TeachDialog(QtWidgets.QDialog):
 
         for row_idx, fn in enumerate(function_list):
             fn_label = QtWidgets.QLabel(FUNCTION_LABELS.get(fn, fn))
-            fn_label.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor)))
+            fn_label.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
             grid.addWidget(fn_label, row_idx, 0)
 
             sc_str = self.reverse_map.get(fn, "—")
             sc_label = QtWidgets.QLabel(sc_str)
-            sc_label.setFont(QtGui.QFont("monospace", int(10 * self.scale_factor)))
+            sc_label.setFont(QtGui.QFont("monospace", int(10 * sf)))
             sc_label.setAlignment(QtCore.Qt.AlignCenter)
-            sc_label.setMinimumWidth(int(60 * self.scale_factor))
+            sc_label.setMinimumWidth(int(60 * sf))
             sc_label.setStyleSheet(
                 "background-color: #fff; border: 1px solid #ddd;"
                 " border-radius: 3px; padding: 1px 4px;"
@@ -670,15 +760,15 @@ class TeachDialog(QtWidgets.QDialog):
             grid.addWidget(sc_label, row_idx, 1)
 
             learn_btn = QtWidgets.QPushButton("Learn")
-            learn_btn.setFont(QtGui.QFont("sans-serif", int(9 * self.scale_factor)))
-            learn_btn.setMinimumHeight(int(26 * self.scale_factor))
+            learn_btn.setFont(QtGui.QFont("sans-serif", int(9 * sf)))
+            learn_btn.setMinimumHeight(int(26 * sf))
             learn_btn.clicked.connect(lambda checked, f=fn: self._start_listening(f))
             grid.addWidget(learn_btn, row_idx, 2)
 
             clear_btn = QtWidgets.QPushButton("✕")
-            clear_btn.setFont(QtGui.QFont("sans-serif", int(9 * self.scale_factor)))
-            clear_btn.setFixedWidth(int(28 * self.scale_factor))
-            clear_btn.setMinimumHeight(int(26 * self.scale_factor))
+            clear_btn.setFont(QtGui.QFont("sans-serif", int(9 * sf)))
+            clear_btn.setFixedWidth(int(28 * sf))
+            clear_btn.setMinimumHeight(int(26 * sf))
             clear_btn.setToolTip("Remove mapping")
             clear_btn.clicked.connect(lambda checked, f=fn: self._clear_mapping(f))
             grid.addWidget(clear_btn, row_idx, 3)
@@ -698,8 +788,8 @@ class TeachDialog(QtWidgets.QDialog):
         self._listen_start_time = time.monotonic()
 
         label = FUNCTION_LABELS.get(function_name, function_name)
-        self.status_label.setText(f"⏳ Press remote button for: {label}")
-        self.status_label.setStyleSheet(
+        self.teach_status_label.setText(f"Press remote button for: {label}")
+        self.teach_status_label.setStyleSheet(
             "color: #fff; background-color: #2a7ad5;"
             " border-radius: 6px; padding: 3px;"
         )
@@ -724,59 +814,13 @@ class TeachDialog(QtWidgets.QDialog):
             label = FUNCTION_LABELS.get(
                 self._listening_function, self._listening_function
             )
-            self.status_label.setText(f"Timed out waiting for: {label}")
-            self.status_label.setStyleSheet(
+            self.teach_status_label.setText(f"Timed out waiting for: {label}")
+            self.teach_status_label.setStyleSheet(
                 "color: #fff; background-color: #888;"
                 " border-radius: 6px; padding: 3px;"
             )
 
         self._listening_function = None
-
-    @QtCore.pyqtSlot(int)
-    def _on_scancode(self, scancode):
-        """Record a scancode mapping when a remote button is pressed during listening."""
-        if self._listening_function is None:
-            return
-
-        elapsed_ms = (time.monotonic() - self._listen_start_time) * 1000
-        if elapsed_ms < self._listen_settle_ms:
-            return
-
-        fn = self._listening_function
-        sc_str = str(scancode)
-
-        # Resolve conflicts
-        conflict_fn = self.keymap.get(sc_str)
-        if conflict_fn and conflict_fn != fn:
-            del self.keymap[sc_str]
-            if conflict_fn in self.reverse_map:
-                del self.reverse_map[conflict_fn]
-            conflict_widgets = self._row_widgets.get(conflict_fn)
-            if conflict_widgets:
-                conflict_widgets["sc_label"].setText("—")
-
-        if fn in self.reverse_map:
-            old_sc = self.reverse_map[fn]
-            if old_sc in self.keymap:
-                del self.keymap[old_sc]
-
-        self.keymap[sc_str] = fn
-        self.reverse_map[fn] = sc_str
-
-        widgets = self._row_widgets.get(fn)
-        if widgets:
-            widgets["sc_label"].setText(sc_str)
-            widgets["learn_btn"].setStyleSheet("")
-
-        label = FUNCTION_LABELS.get(fn, fn)
-        self.status_label.setText(f"✓ Mapped scancode {scancode} → {label}")
-        self.status_label.setStyleSheet(
-            "color: #fff; background-color: #2e8b57;"
-            " border-radius: 6px; padding: 3px;"
-        )
-
-        self._listening_function = None
-        self._listen_timer.stop()
 
     def _clear_mapping(self, function_name):
         """Remove the scancode mapping for the given function and update the UI."""
@@ -793,10 +837,9 @@ class TeachDialog(QtWidgets.QDialog):
             widgets["sc_label"].setText("—")
 
         label = FUNCTION_LABELS.get(function_name, function_name)
-        self.status_label.setText(f"Cleared mapping for {label}")
-        self.status_label.setStyleSheet(
+        self.teach_status_label.setText(f"Cleared mapping for {label}")
+        self.teach_status_label.setStyleSheet(
             "color: #fff; background-color: #888;"
-            #
             " border-radius: 6px; padding: 3px;"
         )
 
@@ -810,203 +853,92 @@ class TeachDialog(QtWidgets.QDialog):
         for fn, widgets in self._row_widgets.items():
             widgets["sc_label"].setText("—")
 
-        self.status_label.setText("✓ Cleared all mappings")
-        self.status_label.setStyleSheet(
+        self.teach_status_label.setText("Cleared all mappings")
+        self.teach_status_label.setStyleSheet(
             "color: #fff; background-color: #2e8b57;"
             " border-radius: 6px; padding: 3px;"
         )
 
-    def get_keymap(self):
-        """Return a copy of the current scancode-to-function mapping dict."""
-        return dict(self.keymap)
+    # ---- IR scancode handler (shared by Teach + Test) ---------------------
 
+    @QtCore.pyqtSlot(int)
+    def _on_scancode(self, scancode):
+        """Route incoming scancodes to the active tab's handler."""
+        current_tab = self.tabs.currentIndex()
 
-# ---------------------------------------------------------------------------
-# Settings Dialog
-# ---------------------------------------------------------------------------
+        # Teach tab (index 2): record mapping if listening
+        if current_tab == 2 and self._listening_function is not None:
+            elapsed_ms = (time.monotonic() - self._listen_start_time) * 1000
+            if elapsed_ms < self._listen_settle_ms:
+                return
 
+            fn = self._listening_function
+            sc_str = str(scancode)
 
-class SettingsDialog(QtWidgets.QDialog):
-    """Touch-screen accessible settings for repeat timing, posture
-    duration, teach mode, and button testing."""
+            # Resolve conflicts
+            conflict_fn = self.keymap.get(sc_str)
+            if conflict_fn and conflict_fn != fn:
+                del self.keymap[sc_str]
+                if conflict_fn in self.reverse_map:
+                    del self.reverse_map[conflict_fn]
+                conflict_widgets = self._row_widgets.get(conflict_fn)
+                if conflict_widgets:
+                    conflict_widgets["sc_label"].setText("—")
 
-    def __init__(self, config, keymap, ir_reader, parent=None):
-        """
-        Initialize SettingsDialog.
+            if fn in self.reverse_map:
+                old_sc = self.reverse_map[fn]
+                if old_sc in self.keymap:
+                    del self.keymap[old_sc]
 
-        Args:
-            config: Configuration dict with timing and color values.
-            keymap: Dict mapping scancode strings to function names.
-            ir_reader: IRReader instance, passed to Teach/Test sub-dialogs.
-            parent: Optional parent QWidget.
-        """
-        super().__init__(parent)
-        self.config = dict(config)
-        self.keymap = dict(keymap)
-        self.ir_reader = ir_reader
+            self.keymap[sc_str] = fn
+            self.reverse_map[fn] = sc_str
 
-        # Compute scale factor based on screen height
-        screen = QtWidgets.QApplication.primaryScreen()
-        screen_size = screen.size()
-        self.screen_height = screen_size.height()
-        self.scale_factor = min((self.screen_height / 600.0) ** 0.7, 1.5)
+            widgets = self._row_widgets.get(fn)
+            if widgets:
+                widgets["sc_label"].setText(sc_str)
+                widgets["learn_btn"].setStyleSheet("")
 
-        self.setWindowTitle("SPAAC — Settings")
-        self.setModal(True)
-        self.setMinimumSize(int(620 * self.scale_factor), int(460 * self.scale_factor))
+            label = FUNCTION_LABELS.get(fn, fn)
+            self.teach_status_label.setText(
+                f"Mapped scancode {scancode} -> {label}"
+            )
+            self.teach_status_label.setStyleSheet(
+                "color: #fff; background-color: #2e8b57;"
+                " border-radius: 6px; padding: 3px;"
+            )
 
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setSpacing(4)
+            self._listening_function = None
+            self._listen_timer.stop()
 
-        title = QtWidgets.QLabel("Settings")
-        title.setFont(QtGui.QFont("sans-serif", int(18 * self.scale_factor), QtGui.QFont.Bold))
-        title.setAlignment(QtCore.Qt.AlignCenter)
-        layout.addWidget(title)
+        # Test tab (index 3): show result
+        elif current_tab == 3:
+            sc_str = str(scancode)
+            self.test_scancode_label.setText(f"Scancode: {scancode}")
 
-        # --- Repeat delay ---
-        delay_label = QtWidgets.QLabel("Repeat Delay (ms before repeat starts):")
-        delay_label.setFont(QtGui.QFont("sans-serif", int(11 * self.scale_factor)))
-        layout.addWidget(delay_label)
+            fn = self.keymap.get(sc_str, None)
+            if fn:
+                label = FUNCTION_LABELS.get(fn, fn)
+                self.test_function_label.setText(f"Mapped: {label}")
+                self.test_function_label.setStyleSheet(
+                    "background-color: #d4edda; border: 1px solid #28a745;"
+                    " border-radius: 6px; padding: 10px;"
+                    " color: #155724; font-weight: bold;"
+                )
+            else:
+                self.test_function_label.setText("UNMAPPED")
+                self.test_function_label.setStyleSheet(
+                    "background-color: #f8d7da; border: 1px solid #dc3545;"
+                    " border-radius: 6px; padding: 10px;"
+                    " color: #721c24; font-weight: bold;"
+                )
 
-        self.delay_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.delay_slider.setMinimum(100)
-        self.delay_slider.setMaximum(2000)
-        self.delay_slider.setValue(self.config.get("repeat_delay_ms", 500))
-        self.delay_slider.setTickInterval(100)
-        self.delay_slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        layout.addWidget(self.delay_slider)
-
-        self.delay_value_label = QtWidgets.QLabel(f"{self.delay_slider.value()} ms")
-        self.delay_value_label.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor)))
-        self.delay_value_label.setAlignment(QtCore.Qt.AlignCenter)
-        layout.addWidget(self.delay_value_label)
-        self.delay_slider.valueChanged.connect(
-            lambda v: self.delay_value_label.setText(f"{v} ms")
-        )
-
-        # --- Repeat rate ---
-        rate_label = QtWidgets.QLabel("Repeat Rate (ms between repeats):")
-        rate_label.setFont(QtGui.QFont("sans-serif", int(11 * self.scale_factor)))
-        layout.addWidget(rate_label)
-
-        self.rate_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.rate_slider.setMinimum(50)
-        self.rate_slider.setMaximum(1000)
-        self.rate_slider.setValue(self.config.get("repeat_rate_ms", 200))
-        self.rate_slider.setTickInterval(50)
-        self.rate_slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        layout.addWidget(self.rate_slider)
-
-        self.rate_value_label = QtWidgets.QLabel(f"{self.rate_slider.value()} ms")
-        self.rate_value_label.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor)))
-        self.rate_value_label.setAlignment(QtCore.Qt.AlignCenter)
-        layout.addWidget(self.rate_value_label)
-        self.rate_slider.valueChanged.connect(
-            lambda v: self.rate_value_label.setText(f"{v} ms")
-        )
-
-        # --- Posture duration ---
-        posture_label = QtWidgets.QLabel("Posture Display Duration (seconds, 0 = stays on):")
-        posture_label.setFont(QtGui.QFont("sans-serif", int(11 * self.scale_factor)))
-        layout.addWidget(posture_label)
-
-        self.posture_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.posture_slider.setMinimum(0)
-        self.posture_slider.setMaximum(120)
-        self.posture_slider.setValue(self.config.get("posture_duration_sec", 0))
-        self.posture_slider.setTickInterval(5)
-        self.posture_slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        layout.addWidget(self.posture_slider)
-
-        posture_val = self.posture_slider.value()
-        self.posture_value_label = QtWidgets.QLabel(
-            "Always on" if posture_val == 0 else f"{posture_val} sec"
-        )
-        self.posture_value_label.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor)))
-        self.posture_value_label.setAlignment(QtCore.Qt.AlignCenter)
-        layout.addWidget(self.posture_value_label)
-        self.posture_slider.valueChanged.connect(self._update_posture_label)
-
-        layout.addSpacerItem(QtWidgets.QSpacerItem(20, 6))
-
-        # --- Colors ---
-        color_label = QtWidgets.QLabel("Colors:")
-        color_label.setFont(QtGui.QFont("sans-serif", int(11 * self.scale_factor)))
-        layout.addWidget(color_label)
-
-        color_grid = QtWidgets.QGridLayout()
-        color_grid.setSpacing(4)
-
-        self._color_values = {
-            "book_color": self.config.get("book_color", DEFAULT_CONFIG["book_color"]),
-            "text_color": self.config.get("text_color", DEFAULT_CONFIG["text_color"]),
-            "posture_stand_color": self.config.get("posture_stand_color", DEFAULT_CONFIG["posture_stand_color"]),
-            "posture_sit_color": self.config.get("posture_sit_color", DEFAULT_CONFIG["posture_sit_color"]),
-            "posture_kneel_color": self.config.get("posture_kneel_color", DEFAULT_CONFIG["posture_kneel_color"]),
-        }
-        color_labels = {
-            "book_color": "Background",
-            "text_color": "Page numbers",
-            "posture_stand_color": "Stand text",
-            "posture_sit_color": "Sit text",
-            "posture_kneel_color": "Kneel text",
-        }
-        self._color_btns = {}
-        for row, (key, display_name) in enumerate(color_labels.items()):
-            lbl = QtWidgets.QLabel(f"{display_name}:")
-            lbl.setFont(QtGui.QFont("sans-serif", int(10 * self.scale_factor)))
-            color_grid.addWidget(lbl, row, 0)
-
-            btn = QtWidgets.QPushButton()
-            btn.setFixedSize(int(80 * self.scale_factor), int(28 * self.scale_factor))
-            self._apply_color_btn_style(btn, self._color_values[key])
-            btn.clicked.connect(lambda checked, k=key: self._pick_color(k))
-            color_grid.addWidget(btn, row, 1)
-            self._color_btns[key] = btn
-
-        layout.addLayout(color_grid)
-
-        layout.addSpacerItem(QtWidgets.QSpacerItem(20, 6))
-
-        # --- Action buttons row ---
-        action_layout = QtWidgets.QHBoxLayout()
-
-        teach_btn = QtWidgets.QPushButton("🎓  Teach Buttons")
-        teach_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
-        teach_btn.setMinimumHeight(int(44 * self.scale_factor))
-        teach_btn.clicked.connect(self._open_teach)
-        action_layout.addWidget(teach_btn)
-
-        test_btn = QtWidgets.QPushButton("🔍  Test Buttons")
-        test_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
-        test_btn.setMinimumHeight(int(44 * self.scale_factor))
-        test_btn.clicked.connect(self._open_test)
-        action_layout.addWidget(test_btn)
-
-        layout.addLayout(action_layout)
-
-        layout.addSpacerItem(QtWidgets.QSpacerItem(20, 6))
-
-        # --- Save / Cancel ---
-        btn_layout = QtWidgets.QHBoxLayout()
-        ok_btn = QtWidgets.QPushButton("Save")
-        ok_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
-        ok_btn.setMinimumHeight(int(40 * self.scale_factor))
-        ok_btn.clicked.connect(self._save)
-        btn_layout.addWidget(ok_btn)
-
-        cancel_btn = QtWidgets.QPushButton("Cancel")
-        cancel_btn.setFont(QtGui.QFont("sans-serif", int(12 * self.scale_factor)))
-        cancel_btn.setMinimumHeight(int(40 * self.scale_factor))
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
-
-        layout.addLayout(btn_layout)
+    # ---- colour helpers ---------------------------------------------------
 
     def _apply_color_btn_style(self, btn, color):
         """Style a color-picker button with a colored background swatch."""
         btn.setStyleSheet(
-            f"QPushButton {{ background-color: {color}; border: 2px solid #888; border-radius: 4px; }}"
+            f"QPushButton {{ background-color: {color};"
+            f" border: 2px solid #888; border-radius: 4px; }}"
             f" QPushButton:pressed {{ border: 2px solid #fff; }}"
         )
 
@@ -1018,6 +950,8 @@ class SettingsDialog(QtWidgets.QDialog):
             self._color_values[key] = color.name()
             self._apply_color_btn_style(self._color_btns[key], color.name())
 
+    # ---- general helpers --------------------------------------------------
+
     def _update_posture_label(self, value):
         """Update the posture duration label to show 'Always on' or the value in seconds."""
         if value == 0:
@@ -1025,29 +959,9 @@ class SettingsDialog(QtWidgets.QDialog):
         else:
             self.posture_value_label.setText(f"{value} sec")
 
-    def _open_teach(self):
-        """Open the TeachDialog, temporarily resetting debounce to the default value."""
-        old_debounce = self.ir_reader.debounce_ms
-        self.ir_reader.debounce_ms = IRReader.DEFAULT_DEBOUNCE_MS
-
-        dlg = TeachDialog(self.ir_reader, self.keymap, parent=self)
-        if dlg.exec_() == QtWidgets.QDialog.Accepted:
-            self.keymap = dlg.get_keymap()
-
-        self.ir_reader.debounce_ms = old_debounce
-
-    def _open_test(self):
-        """Open the TestButtonDialog, temporarily resetting debounce to the default value."""
-        old_debounce = self.ir_reader.debounce_ms
-        self.ir_reader.debounce_ms = IRReader.DEFAULT_DEBOUNCE_MS
-
-        dlg = TestButtonDialog(self.ir_reader, self.keymap, parent=self)
-        dlg.exec_()
-
-        self.ir_reader.debounce_ms = old_debounce
-
     def _save(self):
         """Collect slider values and color choices into config and accept the dialog."""
+        self._stop_listening()
         self.config["repeat_delay_ms"] = self.delay_slider.value()
         self.config["repeat_rate_ms"] = self.rate_slider.value()
         self.config["posture_duration_sec"] = self.posture_slider.value()
@@ -1150,8 +1064,6 @@ class MainDisplay(QtWidgets.QMainWindow):
         content.setSpacing(8)
 
         # Left panel: large page number
-        border_px = int(6 * self.scale_factor)
-        radius_px = int(16 * self.scale_factor)
         pad_px = int(10 * self.scale_factor)
 
         stacked = QtWidgets.QStackedWidget()
@@ -1160,10 +1072,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.page_label.setFont(QtGui.QFont("Monospace", int(200 * self.scale_factor), QtGui.QFont.Bold))
         self.page_label.setAlignment(QtCore.Qt.AlignCenter)
         self.page_label.setStyleSheet(
-            f"color: {text_color};"
-            f" border: {border_px}px solid rgba(255,255,255,0.25);"
-            f" border-radius: {radius_px}px;"
-            f" padding: {pad_px}px;"
+            f"color: {text_color}; padding: {pad_px}px;"
         )
         stacked.addWidget(self.page_label)
 
@@ -1233,25 +1142,19 @@ class MainDisplay(QtWidgets.QMainWindow):
 
         self.centralWidget().setStyleSheet(f"background-color: {book_color};")
 
-        border_px = int(6 * self.scale_factor)
-        radius_px = int(16 * self.scale_factor)
         pad_px = int(10 * self.scale_factor)
 
         if self.is_blank:
             self.page_label.setText("")
             self.page_label.setStyleSheet(
-                f"color: {book_color};"
-                f" border: {border_px}px solid {book_color};"
-                f" border-radius: {radius_px}px; padding: {pad_px}px;"
+                f"color: {book_color}; padding: {pad_px}px;"
             )
             self.icon_label.hide()
             return
 
         self.page_label.setText(str(self.current_page))
         self.page_label.setStyleSheet(
-            f"color: {text_color};"
-            f" border: {border_px}px solid rgba(255,255,255,0.25);"
-            f" border-radius: {radius_px}px; padding: {pad_px}px;"
+            f"color: {text_color}; padding: {pad_px}px;"
         )
 
         # Posture icon — position and colorize, or hide when no posture set
@@ -1436,6 +1339,11 @@ class MainDisplay(QtWidgets.QMainWindow):
 
         self._settings_open = True
 
+        # Use the default debounce while settings is open so the Teach and
+        # Test tabs can receive individual button presses reliably.
+        old_debounce = self.ir_reader.debounce_ms
+        self.ir_reader.debounce_ms = IRReader.DEFAULT_DEBOUNCE_MS
+
         dlg = SettingsDialog(self.config, self.keymap, self.ir_reader, parent=self)
         if dlg.exec_() == QtWidgets.QDialog.Accepted:
             self.config = dlg.get_config()
@@ -1450,6 +1358,7 @@ class MainDisplay(QtWidgets.QMainWindow):
 
             self._update_display()
 
+        self.ir_reader.debounce_ms = old_debounce
         self._settings_open = False
 
     def closeEvent(self, event):
