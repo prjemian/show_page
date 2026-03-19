@@ -154,82 +154,6 @@ def _colorize_pixmap(pixmap, color):
     return colored
 
 
-def _generate_posture_icons():
-    """Create white-on-transparent stick-figure PNG icons in ICON_DIR if absent.
-
-    Must be called after QApplication is initialized (QPixmap requires it).
-    """
-    ICON_DIR.mkdir(parents=True, exist_ok=True)
-    W, H = 200, 380
-    PEN_W = 14
-    HEAD_R = 28
-    cx = W // 2  # horizontal centre = 100
-
-    def _make_pixmap():
-        pix = QtGui.QPixmap(W, H)
-        pix.fill(QtCore.Qt.transparent)
-        return pix
-
-    def _make_painter(pix):
-        p = QtGui.QPainter(pix)
-        p.setRenderHint(QtGui.QPainter.Antialiasing)
-        pen = QtGui.QPen(QtGui.QColor("white"))
-        pen.setWidth(PEN_W)
-        pen.setCapStyle(QtCore.Qt.RoundCap)
-        pen.setJoinStyle(QtCore.Qt.RoundJoin)
-        p.setPen(pen)
-        p.setBrush(QtGui.QColor("white"))
-        return p
-
-    # --- Stand ---
-    path = ICON_DIR / "stand.png"
-    if not path.exists():
-        pix = _make_pixmap()
-        p = _make_painter(pix)
-        p.drawEllipse(cx - HEAD_R, 7, HEAD_R * 2, HEAD_R * 2)  # head
-        p.drawLine(cx, 7 + HEAD_R * 2, cx, 210)                # torso
-        p.drawLine(cx, 115, 38, 180)                            # left arm
-        p.drawLine(cx, 115, 162, 180)                           # right arm
-        p.drawLine(cx, 210, 68, 368)                            # left leg
-        p.drawLine(cx, 210, 132, 368)                           # right leg
-        p.end()
-        pix.save(str(path), "PNG")
-
-    # --- Sit ---
-    path = ICON_DIR / "sit.png"
-    if not path.exists():
-        pix = _make_pixmap()
-        p = _make_painter(pix)
-        p.drawEllipse(cx - HEAD_R, 7, HEAD_R * 2, HEAD_R * 2)  # head
-        p.drawLine(cx, 7 + HEAD_R * 2, cx, 185)                # torso
-        p.drawLine(cx, 115, 38, 175)                            # left arm
-        p.drawLine(cx, 115, 162, 175)                           # right arm
-        p.drawLine(cx, 185, 28, 185)                            # left thigh (horizontal)
-        p.drawLine(cx, 185, 172, 185)                           # right thigh (horizontal)
-        p.drawLine(28, 185, 28, 315)                            # left lower leg
-        p.drawLine(172, 185, 172, 315)                          # right lower leg
-        p.end()
-        pix.save(str(path), "PNG")
-
-    # --- Kneel ---
-    path = ICON_DIR / "kneel.png"
-    if not path.exists():
-        pix = _make_pixmap()
-        p = _make_painter(pix)
-        p.drawEllipse(cx - HEAD_R, 27, HEAD_R * 2, HEAD_R * 2)  # head (lower = shorter figure)
-        p.drawLine(cx, 27 + HEAD_R * 2, cx, 225)                # torso
-        p.drawLine(cx, 145, 38, 225)                             # left arm
-        p.drawLine(cx, 145, 162, 225)                            # right arm
-        p.drawLine(cx, 225, 48, 308)                             # left upper leg (to knee)
-        p.drawLine(cx, 225, 152, 308)                            # right upper leg (to knee)
-        p.drawLine(48, 308, 18, 308)                             # left shin (horizontal, on floor)
-        p.drawLine(152, 308, 182, 308)                           # right shin (horizontal, on floor)
-        p.drawLine(18, 308, 18, 360)                             # left foot
-        p.drawLine(182, 308, 182, 360)                           # right foot
-        p.end()
-        pix.save(str(path), "PNG")
-
-
 # ---------------------------------------------------------------------------
 # IR Reader Thread  (evdev, EV_MSC only)
 # ---------------------------------------------------------------------------
@@ -1426,9 +1350,6 @@ def main():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
     app = QtWidgets.QApplication(sys.argv)
-
-    # Generate posture icon PNGs on first run (requires QApplication)
-    _generate_posture_icons()
 
     # Hide cursor for kiosk mode
     app.setOverrideCursor(QtCore.Qt.BlankCursor)
