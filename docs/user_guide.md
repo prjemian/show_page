@@ -84,9 +84,9 @@ screen:
 | Kneel | Kneeling stick figure | Brown | Lower right |
 
 The icons are white-on-transparent stick figures stored as `stand.png`,
-`sit.png`, and `kneel.png` in the project directory.  If the files are missing
-they are auto-generated on launch.  The displayed color is taken from the posture
-color settings and can be changed on the **Colors** tab of the Settings dialog.
+`sit.png`, and `kneel.png` in the project directory.  The displayed color is
+taken from the posture color settings and can be changed on the **Colors** tab
+of the Settings dialog.
 
 Press the same button a second time to clear the icon.
 

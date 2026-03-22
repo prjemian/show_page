@@ -79,3 +79,8 @@ button in the lower corner).
 - [x] Update all documentation (README, User Guide, Installation Guide,
   Troubleshooting) to reflect UI changes.  Screenshot placeholders
   marked with `<!-- TODO: replace with updated screenshot -->`.
+
+## 2026-03-21: rename repo
+
+- future: Consider renaming the repo and app
+  - tsooyts (ցույց), neams "show"
