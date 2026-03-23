@@ -938,6 +938,7 @@ class SettingsDialog(QtWidgets.QDialog):
                 " QPushButton:checked { background-color: #d4edda;"
                 " border-color: #28a745; font-weight: bold; }"
             )
+            btn.setProperty("remote_name", name)
             btn.clicked.connect(lambda checked, n=name: self._select_remote(n))
             self.recog_results_layout.addWidget(btn)
 
@@ -955,15 +956,12 @@ class SettingsDialog(QtWidgets.QDialog):
         self._recog_selected_name = name
         self.recog_use_btn.setEnabled(True)
 
-        # Uncheck all other buttons, check the selected one
+        # Uncheck all buttons except the selected one
         for i in range(self.recog_results_layout.count()):
             item = self.recog_results_layout.itemAt(i)
             if item and item.widget():
                 btn = item.widget()
-                # Compare via the stored name in the lambda closure
-                btn.setChecked(False)
-
-        # The clicked button handles its own check state
+                btn.setChecked(btn.property("remote_name") == name)
 
     def _use_recognized_remote(self):
         """Load the selected remote's keymap as the active keymap."""
