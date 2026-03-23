@@ -1178,7 +1178,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         """Return a scaled font size that fits *n_digits* without crowding the posture icon."""
         # Base size for 1-3 digits; reduce for 4 digits so the text
         # leaves room for the posture icon on the right.
-        base = 260 if n_digits <= 3 else 190
+        base = {1: 260, 2: 260, 3: 260, 4: 150}.get(n_digits, 150)
         return int(base * self.scale_factor)
 
     def _update_display(self):
