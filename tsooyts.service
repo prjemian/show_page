@@ -11,7 +11,7 @@ User=pi
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/pi/.Xauthority
 ExecStartPre=/bin/sleep 5
-ExecStart=/usr/bin/python3 /home/pi/Documents/tsooyts/tsooyts_display.py
+ExecStart=/home/pi/Documents/tsooyts/.venv/bin/tsooyts
 Restart=always
 RestartSec=5
 

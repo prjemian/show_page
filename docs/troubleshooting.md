@@ -191,7 +191,7 @@ Common causes and fixes:
 To test the service command manually (as the pi user, with a display):
 
 ```bash
-DISPLAY=:0 XAUTHORITY=/home/pi/.Xauthority python3 /home/pi/Documents/tsooyts/tsooyts_display.py
+DISPLAY=:0 XAUTHORITY=/home/pi/.Xauthority /home/pi/Documents/tsooyts/.venv/bin/tsooyts
 ```
 
 ---
