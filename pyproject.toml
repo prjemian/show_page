@@ -22,7 +22,6 @@ classifiers = [
 ]
 dependencies = [
     "evdev",
-    "PyQt5",
 ]
 
 [project.scripts]

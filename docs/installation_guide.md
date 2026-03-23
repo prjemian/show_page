@@ -324,13 +324,15 @@ Select device `gpio_ir_recv` and press any button on the remote.  You should see
 cd /home/pi/Documents
 git clone https://github.com/prjemian/tsooyts.git
 cd tsooyts
-python3 -m venv .venv
+python3 -m venv --system-site-packages .venv
 .venv/bin/pip install .
 ```
 
-This creates a virtual environment, installs the `tsooyts` package and its
-dependencies (`evdev`, `PyQt5`), and provides a `tsooyts` console command at
-`.venv/bin/tsooyts`.
+The `--system-site-packages` flag allows the virtual environment to access
+the system-installed `python3-pyqt5` package (PyQt5 cannot be built from
+source on the Pi without a full Qt5 development toolchain).  The remaining
+dependency (`evdev`) is installed by pip.  The `tsooyts` console command is
+available at `.venv/bin/tsooyts`.
 
 ### Set Desktop Wallpaper
 

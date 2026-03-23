@@ -29,10 +29,11 @@ and a standard TV remote.
 ## Installation
 
 ```bash
+sudo apt install -y python3-pyqt5 python3-evdev
 cd /home/pi/Documents
 git clone https://github.com/prjemian/tsooyts.git
 cd tsooyts
-python3 -m venv .venv
+python3 -m venv --system-site-packages .venv
 .venv/bin/pip install .
 ```
 
