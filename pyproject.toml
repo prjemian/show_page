@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "setuptools-scm[toml]>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tsooyts"
+dynamic = ["version"]
+description = "Electronic page display for church congregations."
+readme = "README.md"
+license = "CC0-1.0"
+requires-python = ">=3.9"
+authors = [
+    { name = "Pete Jemian", email = "prjemian@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: Presentation",
+]
+dependencies = [
+    "evdev",
+]
+
+[project.scripts]
+tsooyts = "tsooyts.display:main"
+
+[project.urls]
+Homepage = "https://github.com/prjemian/tsooyts"
+Issues = "https://github.com/prjemian/tsooyts/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tsooyts = ["icons/*.png"]
+
+[tool.setuptools_scm]

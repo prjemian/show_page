@@ -4,6 +4,19 @@ This guide covers assembling the hardware, flashing the Raspberry Pi, configurin
 the operating system, and deploying the application so it starts automatically on
 boot.
 
+## Contents
+
+- [Parts List](#parts-list)
+- [Assemble the Hardware](#assemble-the-hardware)
+- [Flash the microSD Card](#flash-the-microsd-card)
+- [First Boot and OS Configuration](#first-boot-and-os-configuration)
+- [Configure the IR Receiver](#configure-the-ir-receiver)
+- [Install Software Dependencies](#install-software-dependencies)
+- [Deploy the Application](#deploy-the-application)
+- [Configure Autostart via systemd](#configure-autostart-via-systemd)
+- [Disable Unnecessary Services (Optional)](#disable-unnecessary-services-optional)
+- [Post-Installation: Teach the Remote](#post-installation-teach-the-remote)
+
 ---
 
 ## Parts List
@@ -305,26 +318,21 @@ Select device `gpio_ir_recv` and press any button on the remote.  You should see
 
 ## Deploy the Application
 
-### Copy the Files
-
-```bash
-mkdir -p /home/pi/Documents/tsooyts
-cp tsooyts_display.py /home/pi/Documents/tsooyts/
-cp Ararat-and-Khor-Virap.png /home/pi/Documents/tsooyts/
-```
-
-Or clone the repository directly:
+### Clone and Install
 
 ```bash
 cd /home/pi/Documents
 git clone https://github.com/prjemian/tsooyts.git
+cd tsooyts
+python3 -m venv --system-site-packages .venv
+.venv/bin/pip install .
 ```
 
-### Make the Script Executable
-
-```bash
-chmod +x /home/pi/Documents/tsooyts/tsooyts_display.py
-```
+The `--system-site-packages` flag allows the virtual environment to access
+the system-installed `python3-pyqt5` package (PyQt5 cannot be built from
+source on the Pi without a full Qt5 development toolchain).  The remaining
+dependency (`evdev`) is installed by pip.  The `tsooyts` console command is
+available at `.venv/bin/tsooyts`.
 
 ### Set Desktop Wallpaper
 
@@ -355,7 +363,7 @@ wallpaper=/home/pi/Documents/tsooyts/Ararat-and-Khor-Virap.png
 With a display connected, run:
 
 ```bash
-DISPLAY=:0 python3 /home/pi/Documents/tsooyts/tsooyts_display.py
+DISPLAY=:0 /home/pi/Documents/tsooyts/.venv/bin/tsooyts
 ```
 
 The app should open full-screen.  Press Escape to quit.  If it works, proceed
@@ -383,7 +391,7 @@ Key lines to check:
 User=pi
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/pi/.Xauthority
-ExecStart=/usr/bin/python3 /home/pi/Documents/tsooyts/tsooyts_display.py
+ExecStart=/home/pi/Documents/tsooyts/.venv/bin/tsooyts
 ```
 
 ### Enable and Start the Service

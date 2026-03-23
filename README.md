@@ -26,14 +26,27 @@ and a standard TV remote.
 | [Installation Guide](docs/installation_guide.md) | Parts list, hardware assembly, OS setup, service configuration |
 | [Troubleshooting Guide](docs/troubleshooting.md) | Diagnosing IR receiver, service, and display problems |
 
+## Installation
+
+```bash
+sudo apt install -y python3-pyqt5 python3-evdev
+cd /home/pi/Documents
+git clone https://github.com/prjemian/tsooyts.git
+cd tsooyts
+python3 -m venv --system-site-packages .venv
+.venv/bin/pip install .
+```
+
+The `tsooyts` command is now available at `.venv/bin/tsooyts`.
+See the [Installation Guide](docs/installation_guide.md) for full details.
+
 ## Source Files
 
 | File | Description |
 |------|-------------|
-| `tsooyts_display.py` | Main Python application (PyQt5 + evdev) |
+| `src/tsooyts/display.py` | Main Python application (PyQt5 + evdev) |
+| `src/tsooyts/icons/*.png` | Posture cue stick-figure icons (stand, sit, kneel) |
 | `tsooyts.service` | systemd service unit — copy to `/etc/systemd/system/` |
-| `stand.png` | Stick-figure icon for "Please Stand" posture cue (white on transparent) |
-| `sit.png`   | Stick-figure icon for "Please Be Seated" posture cue (white on transparent) |
-| `kneel.png` | Stick-figure icon for "Please Kneel" posture cue (white on transparent) |
+| `pyproject.toml` | Python packaging configuration |
 | `Ararat-and-Khor-Virap.png` | Desktop wallpaper image |
 

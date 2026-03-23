@@ -28,7 +28,7 @@ from PyQt5 import QtWidgets
 CONFIG_DIR = Path.home() / ".tsooyts"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 KEYMAP_FILE = CONFIG_DIR / "keymap.json"
-ICON_DIR = Path(__file__).parent
+ICON_DIR = Path(__file__).parent / "icons"
 
 DEFAULT_CONFIG = {
     "repeat_delay_ms": 500,  # ms before key repeat begins
