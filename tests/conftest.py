@@ -10,15 +10,14 @@ real packages are available.
 import importlib
 import sys
 import types
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Stub installer — only if the real package is missing
 # ---------------------------------------------------------------------------
+
 
 def _ensure_module(name, submodules=()):
     """Install a MagicMock into sys.modules for *name* if it is not importable."""
@@ -66,11 +65,13 @@ if isinstance(_qtcore, MagicMock):
 
 if isinstance(_qtwidgets, MagicMock):
     _qtwidgets.QDialog = type(
-        "QDialog", (),
+        "QDialog",
+        (),
         {"__init__": lambda self, *a, **kw: None, "Accepted": 1, "Rejected": 0},
     )
     _qtwidgets.QMainWindow = type(
-        "QMainWindow", (),
+        "QMainWindow",
+        (),
         {"__init__": lambda self, *a, **kw: None},
     )
     _qtwidgets.QApplication = MagicMock
@@ -88,7 +89,7 @@ if isinstance(_qtgui, MagicMock):
 # Detect real PyQt5 availability (before conftest stubs interfere)
 # ---------------------------------------------------------------------------
 
-import subprocess as _sp
+import subprocess as _sp  # noqa: E402
 
 _HAS_REAL_PYQT5 = (
     _sp.run(
@@ -101,6 +102,7 @@ _HAS_REAL_PYQT5 = (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def tmp_json(tmp_path):
@@ -127,6 +129,7 @@ def qapp():
         return
 
     import os
+
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
     from PyQt5 import QtWidgets

@@ -49,4 +49,3 @@ See the [Installation Guide](docs/installation_guide.md) for full details.
 | `tsooyts.service` | systemd service unit — copy to `/etc/systemd/system/` |
 | `pyproject.toml` | Python packaging configuration |
 | `Ararat-and-Khor-Virap.png` | Desktop wallpaper image |
-

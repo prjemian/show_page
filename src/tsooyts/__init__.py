@@ -1,7 +1,6 @@
 """Tsooyts (ցույց) — Electronic page display for church congregations."""
 
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 
 try:
     __version__ = version("tsooyts")

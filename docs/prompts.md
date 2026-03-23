@@ -34,7 +34,7 @@ accept new page number      | ENTER button
 cancel page number change   | LAST button or STOP button
 setup and training          | SETUP button
 
-Empirical observation: Using `evdev` in a demo app, only `EV_MSC` and 
+Empirical observation: Using `evdev` in a demo app, only `EV_MSC` and
 `EV_SYN` (no `EV_KEY`) events were received.
 
 ## Update prompts

@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from tsooyts.display import load_json, save_json
 
 

@@ -14,7 +14,8 @@ requires_pyqt5 = pytest.mark.skipif(
     subprocess.run(
         [sys.executable, "-c", "import PyQt5"],
         capture_output=True,
-    ).returncode != 0,
+    ).returncode
+    != 0,
     reason="PyQt5 not installed",
 )
 
@@ -67,9 +68,7 @@ class TestSettingsDialogKeymap:
         # Mock the confirmation dialog to return Yes
         from PyQt5 import QtWidgets
 
-        with patch.object(
-            QtWidgets.QMessageBox, "question", return_value=QtWidgets.QMessageBox.Yes
-        ):
+        with patch.object(QtWidgets.QMessageBox, "question", return_value=QtWidgets.QMessageBox.Yes):
             dlg._clear_all_mappings()
         assert len(dlg.keymap) == 0
         assert len(dlg.reverse_map) == 0
@@ -77,9 +76,7 @@ class TestSettingsDialogKeymap:
     def test_clear_all_mappings_cancelled(self, dlg):
         from PyQt5 import QtWidgets
 
-        with patch.object(
-            QtWidgets.QMessageBox, "question", return_value=QtWidgets.QMessageBox.No
-        ):
+        with patch.object(QtWidgets.QMessageBox, "question", return_value=QtWidgets.QMessageBox.No):
             dlg._clear_all_mappings()
         # Mappings should be unchanged
         assert len(dlg.keymap) == 2

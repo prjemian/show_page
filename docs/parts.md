@@ -3,7 +3,7 @@
 Touch Screen options
 
 - Overview <https://www.newark.com/search?st=raspberry+pi+touch+screen+7%22>
-- RPI Touch Display 2, 7" Size, 24-bit RGB, 720 x 1280 Pixel Resolution, Raspberry Pi Boards 
+- RPI Touch Display 2, 7" Size, 24-bit RGB, 720 x 1280 Pixel Resolution, Raspberry Pi Boards
   - <https://www.newark.com/raspberry-pi/sc1635/touchscreen-display-7-size-rpi/dp/16AM2468>
   - <https://www.microcenter.com/product/687338/raspberry-pi-touch-display-2>
 - RPI Touch Display 2, 7" Size Enclosures & Cases
