@@ -1,5 +1,14 @@
 # Tsooyts Page Display — Troubleshooting Guide
 
+## Contents
+
+- [IR Receiver: No Signals Reaching the Application](#ir-receiver-no-signals-reaching-the-application)
+- [IR Receiver: Raw Signals Visible But App Does Not Respond](#ir-receiver-raw-signals-visible-but-app-does-not-respond)
+- [Service Does Not Start](#service-does-not-start)
+- [Display Issues](#display-issues)
+- [Application Behavior Issues](#application-behavior-issues)
+- [Diagnostic Commands Summary](#diagnostic-commands-summary)
+
 ---
 
 ## IR Receiver: No Signals Reaching the Application

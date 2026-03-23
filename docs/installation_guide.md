@@ -4,6 +4,19 @@ This guide covers assembling the hardware, flashing the Raspberry Pi, configurin
 the operating system, and deploying the application so it starts automatically on
 boot.
 
+## Contents
+
+- [Parts List](#parts-list)
+- [Assemble the Hardware](#assemble-the-hardware)
+- [Flash the microSD Card](#flash-the-microsd-card)
+- [First Boot and OS Configuration](#first-boot-and-os-configuration)
+- [Configure the IR Receiver](#configure-the-ir-receiver)
+- [Install Software Dependencies](#install-software-dependencies)
+- [Deploy the Application](#deploy-the-application)
+- [Configure Autostart via systemd](#configure-autostart-via-systemd)
+- [Disable Unnecessary Services (Optional)](#disable-unnecessary-services-optional)
+- [Post-Installation: Teach the Remote](#post-installation-teach-the-remote)
+
 ---
 
 ## Parts List

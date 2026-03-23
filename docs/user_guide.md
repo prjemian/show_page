@@ -4,6 +4,17 @@ The tsooyts page display system shows the current page number and congregation
 posture cues on a screen so the entire congregation can follow along.  The
 display is controlled by a TV remote held by an altar server.
 
+## Contents
+
+- [The Display Screen](#the-display-screen)
+- [Remote Control Buttons](#remote-control-buttons)
+- [Changing Pages](#changing-pages)
+- [Posture Cues](#posture-cues)
+- [Blank Screen](#blank-screen)
+- [Settings](#settings)
+- [Configuration Files](#configuration-files)
+- [Stopping the App](#stopping-the-app)
+
 ---
 
 ## The Display Screen
