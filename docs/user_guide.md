@@ -208,6 +208,9 @@ The Test tab lets you verify your button assignments without changing any pages.
 
 ### Recognize tab
 
+<!-- TODO: replace with updated screenshot -->
+> ![Recognize tab](screenshots/recognize_mode.png)
+
 The Recognize tab lets you switch between previously taught remotes without
 re-teaching all buttons.
 
