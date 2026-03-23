@@ -128,7 +128,8 @@ without losing the current page number.
 
 Click the gear button in the lower-right corner of the screen to open the
 settings dialog.  Use the touchscreen or a USB mouse.  The dialog is organized
-into five tabs: **Settings**, **Colors**, **Teach**, **Test**, and **About**.
+into six tabs: **Settings**, **Colors**, **Teach**, **Test**, **Recognize**, and
+**About**.
 
 **Save** (at the bottom of the dialog) stores all changes across every tab and
 closes the dialog.  **Cancel** discards all changes.
@@ -205,6 +206,23 @@ The Test tab lets you verify your button assignments without changing any pages.
    - The function it is mapped to (green) or **UNMAPPED** (red) if the button
       has not been assigned.
 
+### Recognize tab
+
+The Recognize tab lets you switch between previously taught remotes without
+re-teaching all buttons.
+
+1. Switch to the **Recognize** tab.
+2. Press several buttons on the remote you want to use.
+3. The tab collects the scancodes and ranks all known remotes by how many
+   buttons match.
+4. Select the best match from the results list.
+5. Click **Use Selected Remote** to load that remote's button mappings.
+6. Click **Save** to keep the change.
+
+Each time you save from the Teach tab, the current keymap is automatically
+stored in the remotes library (`~/.tsooyts/remotes.json`).  Use **Reset** to
+clear the collected scancodes and start over.
+
 ### About tab
 
 The About tab shows the application name (tsooyts / ցույց), version number,
@@ -219,7 +237,8 @@ The app saves its state automatically to:
 | File | Contents |
 |------|----------|
 | `~/.tsooyts/config.json` | Repeat timing, posture duration, colors |
-| `~/.tsooyts/keymap.json` | Remote button → function mappings |
+| `~/.tsooyts/keymap.json` | Active remote button → function mappings |
+| `~/.tsooyts/remotes.json` | Library of all taught remote keymaps |
 
 These files are created on first run.  You can back them up or copy them
 to another unit to replicate settings.
