@@ -249,8 +249,9 @@ create them.
 ### The gear button is hard to tap
 
 The settings button is intentionally small to avoid accidental taps during
-normal use.  If accessibility is a concern you can tap the exact lower-right
-corner of the touchscreen — the button is 50 × 50 pixels.
+normal use.  If accessibility is a concern you can tap or click the exact lower-right
+corner of the screen — the button is 50 × 50 pixels.  A USB mouse may be
+easier to use than the touchscreen for this button.
 
 ### Dial entry times out immediately
 

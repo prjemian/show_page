@@ -23,6 +23,8 @@ boot.
 
 Optional but recommended:
 
+- USB mouse (or other USB pointing device) for accessing the settings dialog
+  when a touchscreen is not available
 - Clear acrylic or IR-transparent window material for the project box
 - Hot glue or double-sided foam tape for mounting the sensor
 - Strain-relief grommet for the cable exit on the project box
@@ -433,7 +435,8 @@ is available when the tsooyts service starts.
 
 After the app is running, teach it your remote's buttons:
 
-1. Touch the gear button in the lower-right corner of the screen.
+1. Click the gear button in the lower-right corner of the screen (use the
+   touchscreen or a USB mouse).
 2. Switch to the **Teach** tab.
 3. Follow the [Teach tab instructions](user_guide.md#teach-tab) in the User Guide.
 4. Tap **Save**.
