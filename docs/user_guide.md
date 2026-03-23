@@ -145,6 +145,8 @@ button again.
 
 ### Colors tab
 
+> ![Colors tab](screenshots/colors_mode.png)
+
 Five color swatches let you change the display color scheme:
 
 | Swatch | Controls |
