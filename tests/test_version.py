@@ -24,7 +24,8 @@ class TestVersion:
     subprocess.run(
         [sys.executable, "-c", "import PyQt5"],
         capture_output=True,
-    ).returncode != 0,
+    ).returncode
+    != 0,
     reason="PyQt5 not installed (subprocess check)",
 )
 class TestMainVersion:
@@ -33,9 +34,11 @@ class TestMainVersion:
     def test_version_flag_prints_and_exits(self):
         """Run `python -m tsooyts.display --version` and check output."""
         result = subprocess.run(
-            [sys.executable, "-c",
-             "import sys; sys.argv = ['tsooyts', '--version']; "
-             "from tsooyts.display import main; main()"],
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.argv = ['tsooyts', '--version']; from tsooyts.display import main; main()",
+            ],
             capture_output=True,
             text=True,
         )

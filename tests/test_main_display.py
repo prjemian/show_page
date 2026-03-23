@@ -14,7 +14,8 @@ requires_pyqt5 = pytest.mark.skipif(
     subprocess.run(
         [sys.executable, "-c", "import PyQt5"],
         capture_output=True,
-    ).returncode != 0,
+    ).returncode
+    != 0,
     reason="PyQt5 not installed",
 )
 

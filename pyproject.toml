@@ -25,6 +25,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = [
+    "pre-commit",
+]
 test = [
     "coverage",
     "pytest",
@@ -43,5 +46,18 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 tsooyts = ["icons/*.png"]
+
+[tool.ruff]
+line-length = 115
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "W",   # pycodestyle warnings
+]
 
 [tool.setuptools_scm]

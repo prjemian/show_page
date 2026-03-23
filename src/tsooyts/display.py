@@ -18,9 +18,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import evdev
-from PyQt5 import QtCore
-from PyQt5 import QtGui
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 # ---------------------------------------------------------------------------
 # Configuration defaults and paths
@@ -164,7 +162,7 @@ POSTURE_SYMBOLS = {
 def load_json(path, default):
     """Load JSON file or return default."""
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return dict(default)
@@ -185,9 +183,7 @@ def _colorize_pixmap(pixmap, color):
     """
     # Ensure the source has an alpha channel for the compositing to work.
     if not pixmap.hasAlphaChannel():
-        pixmap = pixmap.toImage().convertToFormat(
-            QtGui.QImage.Format_ARGB32_Premultiplied
-        )
+        pixmap = pixmap.toImage().convertToFormat(QtGui.QImage.Format_ARGB32_Premultiplied)
         pixmap = QtGui.QPixmap.fromImage(pixmap)
 
     colored = QtGui.QPixmap(pixmap.size())
@@ -278,10 +274,7 @@ class IRReader(QtCore.QObject):
                     if not r:
                         continue
                     for event in self._device.read():
-                        if (
-                            event.type == evdev.ecodes.EV_MSC
-                            and event.code == evdev.ecodes.MSC_SCAN
-                        ):
+                        if event.type == evdev.ecodes.EV_MSC and event.code == evdev.ecodes.MSC_SCAN:
                             self._debounced_emit(event.value)
             except OSError:
                 self._device = None
@@ -497,9 +490,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.delay_value_label.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
         self.delay_value_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(self.delay_value_label)
-        self.delay_slider.valueChanged.connect(
-            lambda v: self.delay_value_label.setText(f"{v} ms")
-        )
+        self.delay_slider.valueChanged.connect(lambda v: self.delay_value_label.setText(f"{v} ms"))
 
         # --- Repeat rate ---
         rate_label = QtWidgets.QLabel("Repeat Rate (ms between repeats):")
@@ -518,9 +509,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.rate_value_label.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
         self.rate_value_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(self.rate_value_label)
-        self.rate_slider.valueChanged.connect(
-            lambda v: self.rate_value_label.setText(f"{v} ms")
-        )
+        self.rate_slider.valueChanged.connect(lambda v: self.rate_value_label.setText(f"{v} ms"))
 
         # --- Posture duration ---
         posture_label = QtWidgets.QLabel("Posture Display Duration (seconds, 0 = stays on):")
@@ -536,9 +525,7 @@ class SettingsDialog(QtWidgets.QDialog):
         layout.addWidget(self.posture_slider)
 
         posture_val = self.posture_slider.value()
-        self.posture_value_label = QtWidgets.QLabel(
-            "Always on" if posture_val == 0 else f"{posture_val} sec"
-        )
+        self.posture_value_label = QtWidgets.QLabel("Always on" if posture_val == 0 else f"{posture_val} sec")
         self.posture_value_label.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
         self.posture_value_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(self.posture_value_label)
@@ -565,15 +552,9 @@ class SettingsDialog(QtWidgets.QDialog):
         self._color_values = {
             "book_color": self.config.get("book_color", DEFAULT_CONFIG["book_color"]),
             "text_color": self.config.get("text_color", DEFAULT_CONFIG["text_color"]),
-            "posture_stand_color": self.config.get(
-                "posture_stand_color", DEFAULT_CONFIG["posture_stand_color"]
-            ),
-            "posture_sit_color": self.config.get(
-                "posture_sit_color", DEFAULT_CONFIG["posture_sit_color"]
-            ),
-            "posture_kneel_color": self.config.get(
-                "posture_kneel_color", DEFAULT_CONFIG["posture_kneel_color"]
-            ),
+            "posture_stand_color": self.config.get("posture_stand_color", DEFAULT_CONFIG["posture_stand_color"]),
+            "posture_sit_color": self.config.get("posture_sit_color", DEFAULT_CONFIG["posture_sit_color"]),
+            "posture_kneel_color": self.config.get("posture_kneel_color", DEFAULT_CONFIG["posture_kneel_color"]),
         }
 
         color_labels = {
@@ -622,9 +603,7 @@ class SettingsDialog(QtWidgets.QDialog):
 
         sf = self.scale_factor
 
-        instructions = QtWidgets.QLabel(
-            'Click "Learn" next to a function, then press the remote button once.'
-        )
+        instructions = QtWidgets.QLabel('Click "Learn" next to a function, then press the remote button once.')
         instructions.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
         instructions.setAlignment(QtCore.Qt.AlignCenter)
         instructions.setWordWrap(True)
@@ -637,8 +616,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.teach_status_label.setAlignment(QtCore.Qt.AlignCenter)
         self.teach_status_label.setMinimumHeight(int(24 * sf))
         self.teach_status_label.setStyleSheet(
-            "color: #ffffff; background-color: #444;"
-            " border-radius: 6px; padding: 3px;"
+            "color: #ffffff; background-color: #444; border-radius: 6px; padding: 3px;"
         )
         layout.addWidget(self.teach_status_label)
 
@@ -692,10 +670,7 @@ class SettingsDialog(QtWidgets.QDialog):
 
         sf = self.scale_factor
 
-        instructions = QtWidgets.QLabel(
-            "Press any button on the remote to see\n"
-            "what function it is mapped to."
-        )
+        instructions = QtWidgets.QLabel("Press any button on the remote to see\nwhat function it is mapped to.")
         instructions.setFont(QtGui.QFont("sans-serif", int(12 * sf)))
         instructions.setAlignment(QtCore.Qt.AlignCenter)
         instructions.setStyleSheet("color: #555;")
@@ -707,20 +682,16 @@ class SettingsDialog(QtWidgets.QDialog):
         self.test_scancode_label.setFont(QtGui.QFont("monospace", int(16 * sf)))
         self.test_scancode_label.setAlignment(QtCore.Qt.AlignCenter)
         self.test_scancode_label.setStyleSheet(
-            "background-color: #fff; border: 1px solid #ccc;"
-            " border-radius: 6px; padding: 10px;"
+            "background-color: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 10px;"
         )
         layout.addWidget(self.test_scancode_label)
 
         self.test_function_label = QtWidgets.QLabel("Function: —")
-        self.test_function_label.setFont(
-            QtGui.QFont("sans-serif", int(20 * sf), QtGui.QFont.Bold)
-        )
+        self.test_function_label.setFont(QtGui.QFont("sans-serif", int(20 * sf), QtGui.QFont.Bold))
         self.test_function_label.setAlignment(QtCore.Qt.AlignCenter)
         self.test_function_label.setMinimumHeight(int(60 * sf))
         self.test_function_label.setStyleSheet(
-            "background-color: #f0f0f0; border: 1px solid #ccc;"
-            " border-radius: 6px; padding: 10px;"
+            "background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 6px; padding: 10px;"
         )
         layout.addWidget(self.test_function_label)
 
@@ -741,9 +712,7 @@ class SettingsDialog(QtWidgets.QDialog):
 
         # App name
         name_label = QtWidgets.QLabel("tsooyts (ցույց)")
-        name_label.setFont(
-            QtGui.QFont("sans-serif", int(22 * sf), QtGui.QFont.Bold)
-        )
+        name_label.setFont(QtGui.QFont("sans-serif", int(22 * sf), QtGui.QFont.Bold))
         name_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(name_label)
 
@@ -803,9 +772,7 @@ class SettingsDialog(QtWidgets.QDialog):
         sf = self.scale_factor
 
         instructions = QtWidgets.QLabel(
-            "Press several buttons on the remote.\n"
-            "Known remotes will be ranked by how many\n"
-            "buttons match."
+            "Press several buttons on the remote.\nKnown remotes will be ranked by how many\nbuttons match."
         )
         instructions.setFont(QtGui.QFont("sans-serif", int(10 * sf)))
         instructions.setAlignment(QtCore.Qt.AlignCenter)
@@ -826,8 +793,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.recog_scancodes_label.setAlignment(QtCore.Qt.AlignCenter)
         self.recog_scancodes_label.setWordWrap(True)
         self.recog_scancodes_label.setStyleSheet(
-            "background-color: #fff; border: 1px solid #ccc;"
-            " border-radius: 6px; padding: 6px;"
+            "background-color: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 6px;"
         )
         layout.addWidget(self.recog_scancodes_label)
 
@@ -850,8 +816,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.recog_status_label.setAlignment(QtCore.Qt.AlignCenter)
         self.recog_status_label.setMinimumHeight(int(24 * sf))
         self.recog_status_label.setStyleSheet(
-            "color: #ffffff; background-color: #444;"
-            " border-radius: 6px; padding: 3px;"
+            "color: #ffffff; background-color: #444; border-radius: 6px; padding: 3px;"
         )
         layout.addWidget(self.recog_status_label)
 
@@ -887,8 +852,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.recog_use_btn.setEnabled(False)
         self.recog_status_label.setText("")
         self.recog_status_label.setStyleSheet(
-            "color: #ffffff; background-color: #444;"
-            " border-radius: 6px; padding: 3px;"
+            "color: #ffffff; background-color: #444; border-radius: 6px; padding: 3px;"
         )
         # Clear results
         while self.recog_results_layout.count():
@@ -947,8 +911,7 @@ class SettingsDialog(QtWidgets.QDialog):
             short = best_name[:12] + "..." if len(best_name) > 15 else best_name
             self.recog_status_label.setText(f"Best match: {short}")
             self.recog_status_label.setStyleSheet(
-                "color: #fff; background-color: #2e8b57;"
-                " border-radius: 6px; padding: 3px;"
+                "color: #fff; background-color: #2e8b57; border-radius: 6px; padding: 3px;"
             )
 
     def _select_remote(self, name):
@@ -988,8 +951,7 @@ class SettingsDialog(QtWidgets.QDialog):
         short = name[:12] + "..." if len(name) > 15 else name
         self.recog_status_label.setText(f"Loaded remote: {short}")
         self.recog_status_label.setStyleSheet(
-            "color: #fff; background-color: #2a7ad5;"
-            " border-radius: 6px; padding: 3px;"
+            "color: #fff; background-color: #2a7ad5; border-radius: 6px; padding: 3px;"
         )
 
     # ---- teach helpers ----------------------------------------------------
@@ -1013,8 +975,7 @@ class SettingsDialog(QtWidgets.QDialog):
             sc_label.setAlignment(QtCore.Qt.AlignCenter)
             sc_label.setMinimumWidth(int(60 * sf))
             sc_label.setStyleSheet(
-                "background-color: #fff; border: 1px solid #ddd;"
-                " border-radius: 3px; padding: 1px 4px;"
+                "background-color: #fff; border: 1px solid #ddd; border-radius: 3px; padding: 1px 4px;"
             )
             grid.addWidget(sc_label, row_idx, 1)
 
@@ -1049,15 +1010,12 @@ class SettingsDialog(QtWidgets.QDialog):
         label = FUNCTION_LABELS.get(function_name, function_name)
         self.teach_status_label.setText(f"Press remote button for: {label}")
         self.teach_status_label.setStyleSheet(
-            "color: #fff; background-color: #2a7ad5;"
-            " border-radius: 6px; padding: 3px;"
+            "color: #fff; background-color: #2a7ad5; border-radius: 6px; padding: 3px;"
         )
 
         widgets = self._row_widgets.get(function_name)
         if widgets:
-            widgets["learn_btn"].setStyleSheet(
-                "background-color: #2a7ad5; color: white; font-weight: bold;"
-            )
+            widgets["learn_btn"].setStyleSheet("background-color: #2a7ad5; color: white; font-weight: bold;")
 
         self._listen_timer.start(self._listen_timeout_ms)
 
@@ -1070,13 +1028,10 @@ class SettingsDialog(QtWidgets.QDialog):
             if widgets:
                 widgets["learn_btn"].setStyleSheet("")
 
-            label = FUNCTION_LABELS.get(
-                self._listening_function, self._listening_function
-            )
+            label = FUNCTION_LABELS.get(self._listening_function, self._listening_function)
             self.teach_status_label.setText(f"Timed out waiting for: {label}")
             self.teach_status_label.setStyleSheet(
-                "color: #fff; background-color: #888;"
-                " border-radius: 6px; padding: 3px;"
+                "color: #fff; background-color: #888; border-radius: 6px; padding: 3px;"
             )
 
         self._listening_function = None
@@ -1098,8 +1053,7 @@ class SettingsDialog(QtWidgets.QDialog):
         label = FUNCTION_LABELS.get(function_name, function_name)
         self.teach_status_label.setText(f"Cleared mapping for {label}")
         self.teach_status_label.setStyleSheet(
-            "color: #fff; background-color: #888;"
-            " border-radius: 6px; padding: 3px;"
+            "color: #fff; background-color: #888; border-radius: 6px; padding: 3px;"
         )
 
     def _clear_all_mappings(self):
@@ -1109,8 +1063,7 @@ class SettingsDialog(QtWidgets.QDialog):
         reply = QtWidgets.QMessageBox.question(
             self,
             "Clear All Mappings",
-            "Are you sure you want to clear all button mappings?\n\n"
-            "You will need to re-teach every button.",
+            "Are you sure you want to clear all button mappings?\n\nYou will need to re-teach every button.",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
             QtWidgets.QMessageBox.No,
         )
@@ -1125,8 +1078,7 @@ class SettingsDialog(QtWidgets.QDialog):
 
         self.teach_status_label.setText("Cleared all mappings")
         self.teach_status_label.setStyleSheet(
-            "color: #fff; background-color: #2e8b57;"
-            " border-radius: 6px; padding: 3px;"
+            "color: #fff; background-color: #2e8b57; border-radius: 6px; padding: 3px;"
         )
 
     # ---- IR scancode handler (shared by Teach + Test) ---------------------
@@ -1169,12 +1121,9 @@ class SettingsDialog(QtWidgets.QDialog):
                 widgets["learn_btn"].setStyleSheet("")
 
             label = FUNCTION_LABELS.get(fn, fn)
-            self.teach_status_label.setText(
-                f"Mapped scancode {scancode} -> {label}"
-            )
+            self.teach_status_label.setText(f"Mapped scancode {scancode} -> {label}")
             self.teach_status_label.setStyleSheet(
-                "color: #fff; background-color: #2e8b57;"
-                " border-radius: 6px; padding: 3px;"
+                "color: #fff; background-color: #2e8b57; border-radius: 6px; padding: 3px;"
             )
 
             self._listening_function = None
@@ -1332,9 +1281,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         # Ensure the active keymap is represented in the remotes library
         if self.keymap:
             active_scancodes = set(self.keymap.keys())
-            if not any(
-                set(m.keys()) == active_scancodes for m in self.remotes.values()
-            ):
+            if not any(set(m.keys()) == active_scancodes for m in self.remotes.values()):
                 self.remotes[str(uuid4())] = dict(self.keymap)
 
         # State
@@ -1346,9 +1293,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self._settings_open = False
 
         # Repeat controller
-        self.repeat_ctrl = RepeatController(
-            self.config, lookup_fn=self._lookup_function
-        )
+        self.repeat_ctrl = RepeatController(self.config, lookup_fn=self._lookup_function)
 
         # IR reader
         self.ir_reader = IRReader(self.config)
@@ -1399,9 +1344,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.page_label = QtWidgets.QLabel("1")
         self.page_label.setFont(QtGui.QFont("Monospace", self._font_size_for_digits(1), QtGui.QFont.Bold))
         self.page_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.page_label.setStyleSheet(
-            f"color: {text_color}; padding: {pad_px}px;"
-        )
+        self.page_label.setStyleSheet(f"color: {text_color}; padding: {pad_px}px;")
         stacked.addWidget(self.page_label)
 
         self.dial_label = QtWidgets.QLabel("")
@@ -1430,9 +1373,9 @@ class MainDisplay(QtWidgets.QMainWindow):
         self.icon_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         self.icon_label.hide()
 
-        self.right_layout.addStretch(1)        # index 0: top spacer
+        self.right_layout.addStretch(1)  # index 0: top spacer
         self.right_layout.addWidget(self.icon_label)  # index 1
-        self.right_layout.addStretch(1)        # index 2: bottom spacer
+        self.right_layout.addStretch(1)  # index 2: bottom spacer
 
         outer.addWidget(right_panel, 0, 0, QtCore.Qt.AlignRight)
 
@@ -1447,7 +1390,9 @@ class MainDisplay(QtWidgets.QMainWindow):
         )
         self.settings_btn.clicked.connect(self._open_settings)
         outer.addWidget(
-            self.settings_btn, 0, 0,
+            self.settings_btn,
+            0,
+            0,
             QtCore.Qt.AlignBottom | QtCore.Qt.AlignRight,
         )
 
@@ -1483,21 +1428,15 @@ class MainDisplay(QtWidgets.QMainWindow):
 
         if self.is_blank:
             self.page_label.setText("")
-            self.page_label.setStyleSheet(
-                f"color: {book_color}; padding: {pad_px}px;"
-            )
+            self.page_label.setStyleSheet(f"color: {book_color}; padding: {pad_px}px;")
             self.icon_label.hide()
             return
 
         page_text = str(self.current_page)
         font_size = self._font_size_for_digits(len(page_text))
         self.page_label.setText(page_text)
-        self.page_label.setFont(
-            QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold)
-        )
-        self.page_label.setStyleSheet(
-            f"color: {text_color}; padding: {pad_px}px;"
-        )
+        self.page_label.setFont(QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold))
+        self.page_label.setStyleSheet(f"color: {text_color}; padding: {pad_px}px;")
 
         # Posture icon — position and colorize, or hide when no posture set
         if self.posture in (POSTURE_STAND, POSTURE_SIT, POSTURE_KNEEL):
@@ -1505,11 +1444,11 @@ class MainDisplay(QtWidgets.QMainWindow):
             if raw:
                 if self.posture == POSTURE_STAND:
                     pc = QtGui.QColor(self.config.get("posture_stand_color", "#c8a84e"))
-                    self.right_layout.setStretch(0, 0)   # icon at top
+                    self.right_layout.setStretch(0, 0)  # icon at top
                     self.right_layout.setStretch(2, 10)
                 elif self.posture == POSTURE_SIT:
                     pc = QtGui.QColor(self.config.get("posture_sit_color", "#6b8f6b"))
-                    self.right_layout.setStretch(0, 5)   # icon at middle
+                    self.right_layout.setStretch(0, 5)  # icon at middle
                     self.right_layout.setStretch(2, 5)
                 else:  # KNEEL
                     pc = QtGui.QColor(self.config.get("posture_kneel_color", "#8b5e3c"))
@@ -1633,9 +1572,7 @@ class MainDisplay(QtWidgets.QMainWindow):
             self.dialing_digits += digit
 
         font_size = self._font_size_for_digits(len(self.dialing_digits))
-        self.dial_label.setFont(
-            QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold)
-        )
+        self.dial_label.setFont(QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold))
         self.dial_label.setText(self.dialing_digits)
 
         self.dial_timer.start(8000)
@@ -1684,9 +1621,7 @@ class MainDisplay(QtWidgets.QMainWindow):
             return
 
         font_size = self._font_size_for_digits(len(self.dialing_digits))
-        self.dial_label.setFont(
-            QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold)
-        )
+        self.dial_label.setFont(QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold))
         self.dial_label.setText(self.dialing_digits)
         self.dial_timer.start(8000)
 
@@ -1708,9 +1643,7 @@ class MainDisplay(QtWidgets.QMainWindow):
             self.keymap = dlg.get_keymap()
             self.remotes = dlg.get_remotes()
 
-            self.repeat_ctrl = RepeatController(
-                self.config, lookup_fn=self._lookup_function
-            )
+            self.repeat_ctrl = RepeatController(self.config, lookup_fn=self._lookup_function)
 
             save_json(CONFIG_FILE, self.config)
             save_json(KEYMAP_FILE, self.keymap)
