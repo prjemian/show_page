@@ -17,7 +17,8 @@ In normal operation the screen shows:
   the top, seated figure in the middle, kneeling figure near the bottom.  Each icon
   is drawn in a distinct color matching the posture (gold, green, or brown).
 - **Settings button** — a small gear icon in the lower-right corner of the
-  screen, reachable by touch.  The posture icon never overlaps this button.
+  screen, accessible via the touchscreen or a USB mouse.  The posture icon
+  never overlaps this button.
 
 <!-- TODO: replace with updated screenshot -->
 > ![Main display screen](screenshots/main_display.png)
@@ -111,8 +112,9 @@ without losing the current page number.
 
 ## Settings
 
-Touch the gear button in the lower-right corner of the touchscreen to open the
-settings dialog.  The dialog is organized into
+Click the gear button in the lower-right corner of the screen to open the
+settings dialog.  Use the touchscreen or a USB mouse.  The dialog is organized
+into
 four tabs: **Settings**, **Colors**, **Teach**, and **Test**.
 
 **Save** (at the bottom of the dialog) stores all changes across every tab and
@@ -151,8 +153,8 @@ Five color swatches let you change the display color scheme:
 | Sit Icon | Color of the seated posture icon (default: green `#6b8f6b`) |
 | Kneel Icon | Color of the kneeling posture icon (default: brown `#8b5e3c`) |
 
-Tap a swatch to open a color picker.  The swatch updates immediately to show
-the chosen color.  Changes take effect when you tap **Save**.
+Click a swatch to open a color picker.  The swatch updates immediately to show
+the chosen color.  Changes take effect when you click **Save**.
 
 ### Teach tab
 
@@ -166,13 +168,13 @@ function.
 2. The tab shows two columns: *Controls* on the left and *Digits* on the right.
    Each row shows the function name, the currently assigned scancode (if any),
    and **Learn** / **✕** buttons.
-3. Tap **Learn** next to the function you want to assign.  The button turns blue
+3. Click **Learn** next to the function you want to assign.  The button turns blue
    and a status message says "Press remote button for: ...".
 4. Point the remote at the IR receiver and press the button once.
 5. The scancode is captured and shown in the row.  If the same button was already
    assigned to another function, that old assignment is automatically cleared.
 6. Repeat for each function.
-7. Tap **Save** when done, or **Cancel** to discard changes.
+7. Click **Save** when done, or **Cancel** to discard changes.
 
 > **Tip:** Use **Clear All Mappings** to erase all mappings and start fresh with
 > a different remote.
@@ -212,6 +214,6 @@ to another unit to replicate settings.
 During normal use the app runs full-screen without a window border or title bar.
 The mouse cursor is hidden.
 
-- **Touchscreen:** Tap the gear button to open Settings.
+- **Touchscreen or mouse:** Click the gear button to open Settings.
 - **Keyboard (SSH or attached keyboard):** Press **Escape** to quit.
 - **Systemd service:** `sudo systemctl stop tsooyts`
