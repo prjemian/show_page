@@ -1106,7 +1106,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         stacked = QtWidgets.QStackedWidget()
 
         self.page_label = QtWidgets.QLabel("1")
-        self.page_label.setFont(QtGui.QFont("Monospace", int(260 * self.scale_factor), QtGui.QFont.Bold))
+        self.page_label.setFont(QtGui.QFont("Monospace", self._font_size_for_digits(1), QtGui.QFont.Bold))
         self.page_label.setAlignment(QtCore.Qt.AlignCenter)
         self.page_label.setStyleSheet(
             f"color: {text_color}; padding: {pad_px}px;"
@@ -1114,7 +1114,7 @@ class MainDisplay(QtWidgets.QMainWindow):
         stacked.addWidget(self.page_label)
 
         self.dial_label = QtWidgets.QLabel("")
-        self.dial_label.setFont(QtGui.QFont("Monospace", int(260 * self.scale_factor), QtGui.QFont.Bold))
+        self.dial_label.setFont(QtGui.QFont("Monospace", self._font_size_for_digits(1), QtGui.QFont.Bold))
         self.dial_label.setAlignment(QtCore.Qt.AlignCenter)
         self.dial_label.setStyleSheet(
             f"color: #ffffff; background-color: rgba(0,0,0,0.8);"
@@ -1174,6 +1174,13 @@ class MainDisplay(QtWidgets.QMainWindow):
             pix = QtGui.QPixmap(str(path))
             self._posture_pixmaps[posture] = pix if not pix.isNull() else None
 
+    def _font_size_for_digits(self, n_digits):
+        """Return a scaled font size that fits *n_digits* without crowding the posture icon."""
+        # Base size for 1-3 digits; reduce for 4 digits so the text
+        # leaves room for the posture icon on the right.
+        base = 260 if n_digits <= 3 else 190
+        return int(base * self.scale_factor)
+
     def _update_display(self):
         """Refresh the page number, background color, and posture icon from current state."""
         book_color = self.config.get("book_color", "#1a3a5c")
@@ -1191,7 +1198,12 @@ class MainDisplay(QtWidgets.QMainWindow):
             self.icon_label.hide()
             return
 
-        self.page_label.setText(str(self.current_page))
+        page_text = str(self.current_page)
+        font_size = self._font_size_for_digits(len(page_text))
+        self.page_label.setText(page_text)
+        self.page_label.setFont(
+            QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold)
+        )
         self.page_label.setStyleSheet(
             f"color: {text_color}; padding: {pad_px}px;"
         )
@@ -1329,6 +1341,10 @@ class MainDisplay(QtWidgets.QMainWindow):
         if len(self.dialing_digits) < 4:
             self.dialing_digits += digit
 
+        font_size = self._font_size_for_digits(len(self.dialing_digits))
+        self.dial_label.setFont(
+            QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold)
+        )
         self.dial_label.setText(self.dialing_digits)
 
         self.dial_timer.start(8000)
@@ -1376,6 +1392,10 @@ class MainDisplay(QtWidgets.QMainWindow):
             self._cancel_dial()
             return
 
+        font_size = self._font_size_for_digits(len(self.dialing_digits))
+        self.dial_label.setFont(
+            QtGui.QFont("Monospace", font_size, QtGui.QFont.Bold)
+        )
         self.dial_label.setText(self.dialing_digits)
         self.dial_timer.start(8000)
 
