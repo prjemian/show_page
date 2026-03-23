@@ -20,7 +20,6 @@ In normal operation the screen shows:
   screen, accessible via the touchscreen or a USB mouse.  The posture icon
   never overlaps this button.
 
-<!-- TODO: replace with updated screenshot -->
 > ![Main display screen](screenshots/main_display.png)
 > *Normal display: page number, no posture cue.*
 
@@ -66,7 +65,6 @@ delay (configurable in Settings).
 4. If you do nothing for 8 seconds the dial entry is automatically cancelled.
 5. Press **BACKSPACE** to erase the last digit without cancelling.
 
-<!-- TODO: replace with updated screenshot -->
 > ![Dial mode](screenshots/dial_mode.png)
 > *Dialing a page number before pressing ENTER.*
 
@@ -93,9 +91,14 @@ Press the same button a second time to clear the icon.
 If the posture duration (on the **Settings** tab) is set to a non-zero value the
 icon will automatically clear after that many seconds.
 
-<!-- TODO: replace with updated screenshot -->
 > ![Stand posture](screenshots/posture_stand.png)
 > *Display showing standing icon, upper right.*
+
+> ![Sit posture](screenshots/posture_sit.png)
+> *Display showing seated icon, middle right.*
+
+> ![Kneel posture](screenshots/posture_kneel.png)
+> *Display showing kneeling icon, lower right.*
 
 ---
 
@@ -120,7 +123,6 @@ four tabs: **Settings**, **Colors**, **Teach**, and **Test**.
 **Save** (at the bottom of the dialog) stores all changes across every tab and
 closes the dialog.  **Cancel** discards all changes.
 
-<!-- TODO: replace with updated screenshot showing tabbed dialog -->
 > ![Settings dialog](screenshots/settings_dialog.png)
 
 ### Settings tab
@@ -143,6 +145,8 @@ button again.
 
 ### Colors tab
 
+> ![Colors tab](screenshots/colors_mode.png)
+
 Five color swatches let you change the display color scheme:
 
 | Swatch | Controls |
@@ -161,7 +165,6 @@ the chosen color.  Changes take effect when you click **Save**.
 The Teach tab lets you assign any button on your remote to any application
 function.
 
-<!-- TODO: replace with updated screenshot showing Teach tab -->
 > ![Teach tab](screenshots/teach_mode.png)
 
 1. Switch to the **Teach** tab.
@@ -183,7 +186,6 @@ function.
 
 The Test tab lets you verify your button assignments without changing any pages.
 
-<!-- TODO: replace with updated screenshot showing Test tab -->
 > ![Test tab](screenshots/test_mode.png)
 
 1. Switch to the **Test** tab.
